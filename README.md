@@ -1,1 +1,1 @@
-# 570DatabaseManagement
+# CSC 570 - Database Management Project
