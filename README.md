@@ -2,7 +2,7 @@
 
 
 - Project Manager - Erick Constant
-- Assistant Project Manager -
+- Assistant Project Manager - Emuesiri Imarah
 - Back-end Engineer - Billy Anders
 - Front-end Engineer - Makaila Williams
 - SQL Database Architect - Ezaria Alexander
