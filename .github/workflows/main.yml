@@ -1,0 +1,39 @@
+name: Deploy TSX and Python App
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Deploy & Build via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_IP }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            # 1. Navigate to your project folder
+            cd ~/my-project-folder || git clone https://github.com/your-user/your-repo.git ~/my-project-folder
+            cd ~/my-project-folder
+            git pull origin main
+
+            # 2. Build the Frontend (.tsx -> .js)
+            cd frontend
+            npm install
+            npm run build  # <--- THIS IS THE CRITICAL STEP FOR .TSX
+            
+            # 3. Setup Python Backend
+            cd ../backend
+            python3 -m venv venv
+            source venv/bin/activate
+            pip install -r requirements.txt
+            
+            # 4. Refresh PM2 Processes
+            # This ensures your apps keep running in the background
+            pm2 restart all || (pm2 start "gunicorn app:app" --name backend && pm2 start npm --name frontend -- start)
