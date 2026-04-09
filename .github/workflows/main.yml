@@ -18,29 +18,29 @@ jobs:
           username: ${{ secrets.VM_SSH_USER }}
           key: ${{ secrets.VM_SSH_KEY }}
           script: |
-            cd ~/570DatabaseProject || exit
+            # 1. Force a totally clean start to fix folder path issues
+            cd ~
+            rm -rf 570DatabaseProject
             
-            # 1. Sync code
-            git fetch --all
-            git reset --hard origin/main
+            # 2. Clone the fresh repo
+            git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git 570DatabaseProject
             
-            # 2. Build Frontend
-            cd src/frontend
+            # 3. Build the Frontend
+            # Absolute pathing ensures we don't get 'No such file' errors
+            cd ~/570DatabaseProject/src/frontend
             npm install
             npm run build
             
-            # 3. Setup Backend
-            cd ../backend
-            if [ ! -d "venv" ]; then
-              python3 -m venv venv
-            fi
+            # 4. Setup the Backend
+            cd ~/570DatabaseProject/src/backend
+            python3 -m venv venv
             source venv/bin/activate
             pip install --upgrade pip
             pip install -r requirements.txt
-            pip install gunicorn  # Force install gunicorn just in case
+            pip install gunicorn flask
             
-            # 4. Force Restart PM2 using the DIRECT PATH to gunicorn
-            # This prevents the "command not found" error
+            # 5. Restart PM2
+            # Using the direct path to the virtual environment's gunicorn
             pm2 delete backend || true
             pm2 start "./venv/bin/gunicorn -w 4 -b 127.0.0.1:8000 backend:app" --name backend
             pm2 save
