@@ -1,4 +1,4 @@
-name: Deploy TSX and Python App
+name: Deploy 570DatabaseManagement
 
 on:
   push:
@@ -14,26 +14,44 @@ jobs:
       - name: Deploy & Build via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.VM_IP }}
-          username: ${{ secrets.VM_USER }}
+          host: ${{ secrets.VM_SSH_IP }}
+          username: ${{ secrets.VM_SSH_USER }}
           key: ${{ secrets.VM_SSH_KEY }}
           script: |
-            # 1. Navigate to your project folder
-            cd ~/my-project-folder || git clone https://github.com/your-user/your-repo.git ~/my-project-folder
-            cd ~/my-project-folder
+            # 1. Navigate to home and handle the project folder
+            cd ~
+            if [ ! -d "570DatabaseProject" ]; then
+              git clone https://github.com/${{ github.repository_owner }}/570DatabaseManagement.git 570DatabaseProject
+            fi
+            cd ~/570DatabaseProject
+            
+            # 2. Update code from GitHub
+            git reset --hard origin/main
             git pull origin main
 
-            # 2. Build the Frontend (.tsx -> .js)
-            cd frontend
+            # 3. Build the Frontend (Vite/TSX)
+            cd src/frontend
             npm install
-            npm run build  # <--- THIS IS THE CRITICAL STEP FOR .TSX
+            npm run build
             
-            # 3. Setup Python Backend
+            # 4. Setup Python Backend
             cd ../backend
-            python3 -m venv venv
+            # Create venv if it doesn't exist
+            if [ ! -d "venv" ]; then
+              python3 -m venv venv
+            fi
             source venv/bin/activate
             pip install -r requirements.txt
             
-            # 4. Refresh PM2 Processes
-            # This ensures your apps keep running in the background
-            pm2 restart all || (pm2 start "gunicorn app:app" --name backend && pm2 start npm --name frontend -- start)
+            # 5. Refresh PM2 Processes
+            # This checks if the 'backend' process exists; restarts if yes, starts if no.
+            pm2 describe backend > /dev/null
+            if [ $? -ne 0 ]; then
+              # Replace 'app:app' with 'main:app' if your filename is main.py
+              pm2 start "gunicorn -w 4 -b 127.0.0.1:8000 app:app" --name backend
+            else
+              pm2 restart backend
+            fi
+
+            # 6. Save PM2 state to survive VM reboots
+            pm2 save
