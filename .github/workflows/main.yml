@@ -8,16 +8,6 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      name: Deploy 570DatabaseManagement
-
-on:
-  push:
-    branches: [ main ]
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
@@ -28,18 +18,24 @@ jobs:
           username: ${{ secrets.VM_SSH_USER }}
           key: ${{ secrets.VM_SSH_KEY }}
           script: |
+            # 1. Navigate to the project folder
+            # If it doesn't exist, clone it using the token
+            if [ ! -d "~/570DatabaseProject" ]; then
+              git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git ~/570DatabaseProject
+            fi
+            
             cd ~/570DatabaseProject
             
-            # 1. Update code
+            # 2. Update code and discard any local VM changes
             git fetch --all
             git reset --hard origin/main
             
-            # 2. Build Frontend
+            # 3. Build the Frontend
             cd src/frontend
             npm install
             npm run build
             
-            # 3. Setup Backend
+            # 4. Setup the Python Backend
             cd ../backend
             if [ ! -d "venv" ]; then
               python3 -m venv venv
@@ -47,8 +43,10 @@ jobs:
             source venv/bin/activate
             pip install -r requirements.txt
             
-            # 4. Restart Python API
-            # I updated "app:app" to "backend:app" based on your file name
+            # 5. Restart the Backend with PM2
+            # We delete and start to ensure the path to 'backend.py' is refreshed
             pm2 delete backend || true
             pm2 start "gunicorn -w 4 -b 127.0.0.1:8000 backend:app" --name backend
+            
+            # 6. Save PM2 state to survive reboots
             pm2 save
