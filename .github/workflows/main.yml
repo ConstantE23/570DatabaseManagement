@@ -8,6 +8,16 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      name: Deploy 570DatabaseManagement
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
@@ -18,25 +28,18 @@ jobs:
           username: ${{ secrets.VM_SSH_USER }}
           key: ${{ secrets.VM_SSH_KEY }}
           script: |
-            cd ~
-            # 1. Clone using the automatic GitHub Token
-            if [ ! -d "570DatabaseProject" ]; then
-              git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git 570DatabaseProject
-            fi
-            
             cd ~/570DatabaseProject
             
-            # 2. Update code
+            # 1. Update code
             git fetch --all
             git reset --hard origin/main
             
-            # 3. Build Frontend
-            # This enters src/frontend, installs packages, and builds the dist folder
+            # 2. Build Frontend
             cd src/frontend
             npm install
             npm run build
             
-            # 4. Setup Backend
+            # 3. Setup Backend
             cd ../backend
             if [ ! -d "venv" ]; then
               python3 -m venv venv
@@ -44,11 +47,8 @@ jobs:
             source venv/bin/activate
             pip install -r requirements.txt
             
-            # 5. Restart Python API
-            pm2 describe backend > /dev/null
-            if [ $? -ne 0 ]; then
-              pm2 start "gunicorn -w 4 -b 127.0.0.1:8000 app:app" --name backend
-            else
-              pm2 restart backend
-            fi
+            # 4. Restart Python API
+            # I updated "app:app" to "backend:app" based on your file name
+            pm2 delete backend || true
+            pm2 start "gunicorn -w 4 -b 127.0.0.1:8000 backend:app" --name backend
             pm2 save
