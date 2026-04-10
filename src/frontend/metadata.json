@@ -1,0 +1,5 @@
+{
+  "name": "Secure Request Dashboard",
+  "description": "A secure portal for managing active requests with a custom dark-themed UI.",
+  "requestFramePermissions": []
+}
