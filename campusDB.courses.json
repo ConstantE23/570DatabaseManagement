@@ -1,0 +1,15 @@
+[{
+  "_id": 401,
+  "course_code": "CSC570",
+  "title": "Databases",
+  "credits": 3,
+  "sections": [
+    {
+      "section_id": 1,
+      "instructor_id": 5001,
+      "classroom_id": 1,
+      "term": "Spring 2026",
+      "seat_cap": 30
+    }
+  ]
+}]

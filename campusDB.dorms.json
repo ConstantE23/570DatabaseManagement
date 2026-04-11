@@ -1,0 +1,19 @@
+[{
+  "_id": 301,
+  "dorm_name": "Eagle Hall",
+  "dorm_address": "1 Campus Way",
+  "rooms": [
+    {
+      "room_id": 1,
+      "room_number": 101,
+      "capacity": 2,
+      "room_type": "Double"
+    },
+    {
+      "room_id": 2,
+      "room_number": 102,
+      "capacity": 1,
+      "room_type": "Single"
+    }
+  ]
+}]

@@ -1,0 +1,9 @@
+[{
+  "_id": 9001,
+  "student_id": 1001,
+  "course_id": 401,
+  "section_id": 1,
+  "status": "Enrolled",
+  "enrollment_date": "2026-01-10",
+  "grade": "A"
+}]
