@@ -25,7 +25,7 @@ const COLORS = {
   skyBlue: '#BAE6FD',
 };
 
-const API_URL = 'http://127.0.0.1:5001';
+const API_URL = 'http://4.239.243.37:8000';
 
 interface TicketData {
   id: number;
@@ -704,4 +704,3 @@ function StatCard({
     </div>
   );
 }
-const response = await fetch(`${API_URL}/tickets/user/${currentUser?.user_id}`);
