@@ -90,8 +90,10 @@ CREATE TABLE HousingContract (
 CREATE TABLE MaintenanceTicket (
     ticket_id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT,
+    title VARCHAR(255),
     priority VARCHAR(20),
     status VARCHAR(20),
+    created_at DATETIME,
     FOREIGN KEY (user_id) REFERENCES User(user_id)
 );
 

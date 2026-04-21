@@ -704,4 +704,3 @@ function StatCard({
     </div>
   );
 }
-const response = await fetch(`${API_URL}/tickets/user/${currentUser?.user_id}`);
