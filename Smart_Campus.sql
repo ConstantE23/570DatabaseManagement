@@ -97,6 +97,7 @@ CREATE TABLE MaintenanceTicket (
     FOREIGN KEY (user_id) REFERENCES User(user_id)
 );
 
+
 CREATE TABLE Door (
     door_id INT AUTO_INCREMENT PRIMARY KEY,
     building_id INT,
