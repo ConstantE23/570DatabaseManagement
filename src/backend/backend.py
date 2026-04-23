@@ -605,6 +605,42 @@ def get_tickets_by_user(user_id):
             cursor.close()
         if connection and connection.is_connected():
             connection.close()
+
+@app.route("/logs", methods=["GET"])
+def get_logs():
+    connection = None
+    cursor = None
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+
+        query = """
+        SELECT 
+            al.log_id,
+            u.first_name,
+            u.last_name,
+            al.action,
+            al.time,
+            al.result
+        FROM Log al
+        JOIN `User` u ON al.user_id = u.user_id
+        ORDER BY al.time DESC
+        """
+        cursor.execute(query)
+        logs = cursor.fetchall()
+
+        for log in logs:
+            if log['time']:
+                log['time'] = log['time'].strftime("%Y-%m-%d %H:%M:%S")
+
+        return success_response(logs)
+
+    except Error as e:
+        return error_response(str(e))
+    finally:
+        if cursor: cursor.close()
+        if connection: connection.close()
+
 @app.route("/login", methods=["POST"])
 def login():
     connection = None
@@ -648,6 +684,7 @@ def login():
         else:
             role = "student"
 
+        log_activity(user_id=user["user_id"], action_name="Login")
         return success_response({
             "message": "Login successful",
             "user": {
@@ -667,6 +704,26 @@ def login():
             cursor.close()
         if connection and connection.is_connected():
             connection.close()
+
+
+def log_activity(user_id, action_name, result="Success"):
+    connection = None
+    cursor = None
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor()
+
+        query = """
+                INSERT INTO Log (user_id, action, time, result)
+                VALUES (%s, %s, NOW(), %s) \
+                """
+        cursor.execute(query, (user_id, action_name, result))
+        connection.commit()
+    except Exception as e:
+        print(f"Logging failed: {e}")
+    finally:
+        if cursor: cursor.close()
+        if connection: connection.close()
 # --------------------------
 # RUN APP
 # --------------------------
