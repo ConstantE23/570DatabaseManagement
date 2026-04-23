@@ -472,6 +472,8 @@ def create_ticket():
 
         connection.commit()
 
+        log_activity(user_id, "Created Maintenance Ticket", "Success")
+
         return success_response({
             "message": "Ticket created successfully",
             "ticket_id": cursor.lastrowid
@@ -607,7 +609,7 @@ def get_tickets_by_user(user_id):
             connection.close()
 
 @app.route("/logs", methods=["GET"])
-def get_logs():
+def get_all_logs():
     connection = None
     cursor = None
     try:
