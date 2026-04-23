@@ -640,13 +640,22 @@ def login():
         if password != user["last_name"]:
             return error_response("Invalid email or password", 401)
 
+        cursor.execute("SELECT staff_id FROM Staff WHERE user_id = %s", (user["user_id"],))
+        staff_record = cursor.fetchone()
+
+        if staff_record:
+            role = "staff"
+        else:
+            role = "student"
+
         return success_response({
             "message": "Login successful",
             "user": {
                 "user_id": user["user_id"],
                 "first_name": user["first_name"],
                 "last_name": user["last_name"],
-                "email": user["email"]
+                "email": user["email"],
+                "role": role
             }
         }, 200)
 
