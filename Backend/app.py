@@ -31,4 +31,29 @@ def get_tickets():
 
 @app.route("/login", methods=["POST"])
 def login():
-    data 
+    data = request.get_json()
+
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    email = data.get("email")
+    password = data.get("password")
+
+    users = load_json("campusDB.users.json")
+
+    for user in users:
+        if user["email"] == email and password == user["last_name"]:
+            return jsonify({
+                "message": "Login successful",
+                "user": {
+                    "user_id": user["_id"],
+                    "first_name": user["first_name"],
+                    "last_name": user["last_name"],
+                    "email": user["email"]
+                }
+            }), 200
+
+    return jsonify({"error": "Invalid email or password"}), 401
+
+if __name__ == "__main__":
+    app.run(debug=True, port=5002)
