@@ -305,19 +305,41 @@ export default function StudentApp({ onBackToPortal }: StudentAppProps)
       onBackToPortal();
     }
   };
-
+  
   // create a new maintenance ticket
   const handleCreateTicket = async (e: React.FormEvent) =>
   {
     e.preventDefault();
+    //if mock mode just add it locally without hitting the backend
 
+    if(mockMode)
+    {
+      const newTicket: TicketData = 
+      {
+        id: tickets.length + 104,
+      user_id: 1,
+      title: ticketTitle,
+      status: 'Pending',
+      priority: ticketPriority,
+      dateSubmitted: new Date().toISOString().split('T')[0],
+      };
+
+      setTickets([...tickets, newTicket]);
+      setTicketModal(false);
+      setTicketTitle('');
+      setTicketLocation('');
+      setTicketPriority('Medium');
+      return;
+    }
+
+    //if backend is live send it for real
     try
     {
       const response = await fetch(`${API_URL}/tickets`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(
           {
             user_id: currentUser?.user_id,
             title: ticketTitle,
@@ -325,26 +347,23 @@ export default function StudentApp({ onBackToPortal }: StudentAppProps)
             priority: ticketPriority,
             status: 'Pending',
           }),
-        });
+      });
 
       if (!response.ok) throw new Error('Failed to create ticket');
 
-      // close the form and reset fields
       setTicketModal(false);
       setTicketTitle('');
       setTicketLocation('');
       setTicketPriority('Medium');
 
-      // reload the ticket list
       if (currentUser) fetchStudentData(currentUser.user_id);
-
     }
     catch (error)
     {
       console.error('Error creating ticket:', error);
     }
   };
-
+  
   // submit a housing contract request
   const handleAssignContract = async (e: React.FormEvent) =>
   {
