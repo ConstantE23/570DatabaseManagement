@@ -20,6 +20,7 @@ function Root()
   return <StudentApp/>;
 
  return
+ (
  <div style={{ backgroundColor: '#0D1321', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
       <h1 style={{ color: '#F0EBD8', fontSize: '28px', marginBottom: '8px' }}>Smart Campus</h1>
       <p style={{ color: '#748CAB', marginBottom: '40px', fontSize: '14px' }}>Select your portal to continue</p>
