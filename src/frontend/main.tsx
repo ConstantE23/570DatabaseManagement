@@ -4,6 +4,9 @@ Course: CSC-570-01
 Des: Guide for user to determine which portal
 */
 
+/*
+code breaks wedbsite
+
 import {useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App';
@@ -38,7 +41,19 @@ function Root()
   );
 }
 createRoot(document.getElementById('root')!).render(<Root/>);
+*/
 
+//code that does not break but is not ideal
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import StudentApp from './StudentApp';
+import './index.css';
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <StudentApp />
+  </StrictMode>,
+);
 
 
 
