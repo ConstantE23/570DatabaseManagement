@@ -14,7 +14,7 @@ import {
   Search,
   Filter,
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const COLORS = {
   primaryDark: '#0D1321',
@@ -25,7 +25,7 @@ const COLORS = {
   skyBlue: '#BAE6FD',
 };
 
-const API_URL = 'http://127.0.0.1:5001';
+const API_URL = 'http://127.0.0.1:5002';
 
 interface TicketData {
   id: number;

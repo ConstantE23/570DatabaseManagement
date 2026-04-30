@@ -41,6 +41,78 @@ const COLORS =
 // backend URL frm same server the panel uses
 const API_URL = 'http://4.239.243.37:5001';
 
+// mock data for demo login
+const DEMO_USER: CurrentUser = {
+  user_id: 12345,
+  first_name: 'Alex',
+  last_name: 'Johnson',
+  email: 'alex.johnson@university.edu',
+};
+
+const DEMO_TICKETS: TicketData[] = [
+  {
+    id: 101,
+    user_id: 12345,
+    title: 'Broken Desk Lamp',
+    status: 'In Progress',
+    priority: 'Medium',
+    dateSubmitted: '2026-04-20',
+  },
+  {
+    id: 102,
+    user_id: 12345,
+    title: 'AC Not Working',
+    status: 'Pending',
+    priority: 'High',
+    dateSubmitted: '2026-04-25',
+  },
+  {
+    id: 103,
+    user_id: 12345,
+    title: 'Door Lock Issue',
+    status: 'Resolved',
+    priority: 'Medium',
+    dateSubmitted: '2026-04-18',
+  },
+];
+
+const DEMO_ENROLLMENTS: Enrollment[] = [
+  {
+    enrollment_id: 201,
+    course_id: 'CSC-570',
+    course_name: 'Smart Campus Operations Management',
+    section: '01',
+    credits: 3,
+    status: 'Enrolled',
+  },
+  {
+    enrollment_id: 202,
+    course_id: 'CSC-480',
+    course_name: 'Software Engineering',
+    section: '02',
+    credits: 4,
+    status: 'Enrolled',
+  },
+  {
+    enrollment_id: 203,
+    course_id: 'MATH-210',
+    course_name: 'Linear Algebra',
+    section: '03',
+    credits: 3,
+    status: 'Enrolled',
+  },
+];
+
+const DEMO_HOUSING: HousingContract = {
+  contract_id: 301,
+  dorm: 'North Hall',
+  room: '204B',
+  room_type: 'Double',
+  start_date: '2026-08-15',
+  end_date: '2027-05-30',
+  status: 'Active',
+};
+
 // types for the data coming back from the backend
 interface CurrentUser
 {
@@ -84,7 +156,12 @@ interface TicketData
 // the four pages the student can navigate to
 type Tab = 'overview' | 'tickets' | 'enrollment' | 'housing';
 
-export default function StudentApp()
+interface StudentAppProps
+{
+  onBackToPortal?: () => void;
+}
+
+export default function StudentApp({ onBackToPortal }: StudentAppProps)
 {
   // login state
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -199,6 +276,17 @@ export default function StudentApp()
     }
   };
 
+  // demo login for testing without backend
+  const handleDemoLogin = () =>
+  {
+    setLoginError('');
+    setCurrentUser(DEMO_USER);
+    setTickets(DEMO_TICKETS);
+    setEnrollments(DEMO_ENROLLMENTS);
+    setHousing(DEMO_HOUSING);
+    setIsLoggedIn(true);
+  };
+
   // handle logout n clear everything out
   const handleLogout = () =>
   {
@@ -211,6 +299,11 @@ export default function StudentApp()
     setHousing(null);
     setActiveTab('overview');
     setLoginError('');
+
+    if (onBackToPortal)
+    {
+      onBackToPortal();
+    }
   };
 
   // create a new maintenance ticket
@@ -310,6 +403,17 @@ export default function StudentApp()
           className="w-full max-w-md p-8 rounded-2xl shadow-2xl"
           style={{ backgroundColor: COLORS.secondaryDark }}
         >
+          {onBackToPortal && (
+            <button
+              type="button"
+              onClick={onBackToPortal}
+              className="mb-4 text-xs font-semibold uppercase tracking-wider hover:underline"
+              style={{ color: COLORS.steelBlue }}
+            >
+              Back to portal selection
+            </button>
+          )}
+
           {/* logo and title */}
           <div className="flex flex-col items-center mb-8">
             <div
@@ -372,6 +476,16 @@ export default function StudentApp()
               Sign In
             </button>
           </form>
+
+          {/* demo login button */}
+          <button
+            type="button"
+            onClick={handleDemoLogin}
+            className="w-full mt-3 py-3 rounded-lg font-bold text-lg hover:opacity-80 active:scale-95 transition-all"
+            style={{ backgroundColor: COLORS.mutedBlue, color: COLORS.cream, border: `2px solid ${COLORS.skyBlue}` }}
+          >
+            Try Demo (Instant Access)
+          </button>
 
           {/* show error if login fails */}
           {loginError && (
@@ -492,7 +606,7 @@ export default function StudentApp()
             className="w-full flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-red-500/10 text-red-400 transition-colors"
           >
             <LogOut size={16} />
-            <span className="text-sm font-medium">Logout</span>
+            <span className="text-sm font-medium">Back to portal</span>
           </button>
         </div>
       </aside>
