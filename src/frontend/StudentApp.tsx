@@ -5,6 +5,16 @@
   File: StudentApp.tsx
   Description: Student View Front End...landing page, tickets, enrollment, housing contract
 
+  AI Disclosure: Claude AI (Anthropic) was used during the debugging process
+  of this file. While troubleshooting a 500 server error caused by changes
+  made to main.tsx and StudentApp.tsx, Claude was used to identify the issue and suggest fixes.
+  All original code structure, logic, and design decisions were developed
+  by the me prior to AI assistance. Errors were present in functionality of student dashboard buttons
+  were not funcitonal and code was crashing demo website.
+
+  APA Citation:
+  Anthropic. (2026). Claude (Version Sonnet 4.6) [Large language model].
+  https://www.anthropic.com
 */
 
 import React, { useEffect, useState } from 'react';
@@ -333,12 +343,12 @@ export default function StudentApp({ onBackToPortal }: StudentAppProps)
     {
       const newTicket: TicketData = 
       {
-        id: tickets.length + 104,
-      user_id: 1,
-      title: ticketTitle,
-      status: 'Pending',
-      priority: ticketPriority,
-      dateSubmitted: new Date().toISOString().split('T')[0],
+        id: tickets.length + 101,
+        user_id: 1,
+        title: ticketTitle,
+        status: 'Pending',
+        priority: ticketPriority,
+        dateSubmitted: new Date().toISOString().split('T')[0],
       };
 
       setTickets([...tickets, newTicket]);
