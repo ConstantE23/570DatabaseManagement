@@ -79,15 +79,15 @@ const DEMO_TICKETS: TicketData[] = [
 const DEMO_ENROLLMENTS: Enrollment[] = [
   {
     enrollment_id: 201,
-    course_id: 'CSC-570',
-    course_name: 'Smart Campus Operations Management',
+    course_id: 'CSC 570',
+    course_name: 'Database Management',
     section: '01',
     credits: 3,
     status: 'Enrolled',
   },
   {
     enrollment_id: 202,
-    course_id: 'CSC-480',
+    course_id: 'CSC 480',
     course_name: 'Software Engineering',
     section: '02',
     credits: 4,
@@ -95,17 +95,33 @@ const DEMO_ENROLLMENTS: Enrollment[] = [
   },
   {
     enrollment_id: 203,
-    course_id: 'MATH-210',
+    course_id: 'MATH 210',
     course_name: 'Linear Algebra',
     section: '03',
     credits: 3,
+    status: 'Enrolled',
+  },
+  {
+    enrollment_id: 204,
+    course_id: 'ENG 254',
+    course_name: 'Technical Writing',
+    section: '01',
+    credits: 3,
+    status: 'Enrolled',
+  },
+  {
+    enrollment_id: 205,
+    course_id: 'CHE 214',
+    course_name: 'Analytical Chemistry',
+    section: '02',
+    credits: 4,
     status: 'Enrolled',
   },
 ];
 
 const DEMO_HOUSING: HousingContract = {
   contract_id: 301,
-  dorm: 'North Hall',
+  dorm: 'Iverson',
   room: '204B',
   room_type: 'Double',
   start_date: '2026-08-15',
