@@ -13,7 +13,6 @@ import {
   Building2,
   Wrench,
   Users,
-  BookOpen,
   ShieldCheck,
   GraduationCap,
   LogOut,
@@ -262,9 +261,10 @@ export default function App() {
   const [formActionNotes,  setFormActionNotes]  = useState('');
   const [formBuilding,     setFormBuilding]     = useState('');
   const [formRoom,         setFormRoom]         = useState('');
-  const [formLocationType, setFormLocationType] = useState<'building' | 'dorm'>('building');
-  const [formDorm,         setFormDorm]         = useState('');
-  const [formDormRoom,     setFormDormRoom]     = useState('');
+  // Note: Location type fields kept for future dorm support
+  // const [formLocationType, setFormLocationType] = useState<'building' | 'dorm'>('building');
+  // const [formDorm,         setFormDorm]         = useState('');
+  // const [formDormRoom,     setFormDormRoom]     = useState('');
   const [maintenanceStaff, setMaintenanceStaff] = useState<string[]>([]);
   const [staffError,       setStaffError]       = useState('');
 
@@ -424,7 +424,6 @@ export default function App() {
     setFormStatus('Pending'); setFormPriority('Medium');
     setFormAssignee(''); setFormActionNotes('');
     setFormBuilding(''); setFormRoom('');
-    setFormLocationType('building'); setFormDorm(''); setFormDormRoom('');
     setIsModalOpen(true);
   };
 
@@ -433,10 +432,6 @@ export default function App() {
     setFormStatus(t.status); setFormPriority(t.priority);
     setFormAssignee(t.assignee || ''); setFormActionNotes(t.actionNotes || '');
     setFormBuilding(t.building || ''); setFormRoom(t.room || '');
-    // Determine if this ticket is for a building or dorm based on available fields
-    const locType = t.building ? 'building' : 'dorm';
-    setFormLocationType(locType as 'building' | 'dorm');
-    setFormDorm(t.dorm || ''); setFormDormRoom(t.dorm_room || '');
     setIsModalOpen(true);
   };
 
@@ -771,7 +766,14 @@ export default function App() {
           />
         );
       case 'access':      return <PlaceholderSection title="Access Control"      description="Issue access cards, view access logs, handle loss reports and card requests." color="#1a4a3a" />;
-      case 'academics':   return <PlaceholderSection title="Academics"           description="View courses, sections, enrollment records, and grade data." color="#2a1a4a" />;
+      case 'academics':
+        return (
+          <AcademicsSection
+            rooms={ROOM_DIRECTORY}
+            selectedRoom={selectedRoom}
+            onSelectRoom={setSelectedRoom}
+          />
+        );
       case 'password':
         return (
           <PasswordSection
@@ -2098,6 +2100,534 @@ function PasswordSection({
           </button>
         </form>
       </div>
+    </div>
+  );
+}
+
+// ─── Academics section ───────────────────────────────────────────────────────
+interface AcademicCourseRecord {
+  course_id: number;
+  course_code: string;
+  title: string;
+  credits: number;
+  department: string;
+  description: string;
+}
+
+interface AcademicSectionRecord {
+  section_id: number;
+  course_id: number;
+  section_number: string;
+  term: string;
+  instructor: string;
+  building: string;
+  room: string;
+  days: string;
+  time: string;
+  capacity: number;
+  enrolled: number;
+  status: 'Open' | 'Closed' | 'Waitlist';
+}
+
+const DEFAULT_ACADEMIC_COURSES: AcademicCourseRecord[] = [
+  { course_id: 1, course_code: 'CSC 101', title: 'Introduction to Programming', credits: 3, department: 'Computer Science', description: 'Foundations of programming' },
+  { course_id: 2, course_code: 'MAT 210', title: 'Discrete Mathematics', credits: 3, department: 'Mathematics', description: 'Logic and sets' },
+];
+
+const DEFAULT_ACADEMIC_SECTIONS: AcademicSectionRecord[] = [
+  { section_id: 1, course_id: 1, section_number: '01', term: 'Spring 2026', instructor: 'Dr. Smith', building: 'Engineering Hall', room: '101', days: 'Mon/Wed/Fri', time: '09:00-10:15', capacity: 30, enrolled: 28, status: 'Open' },
+  { section_id: 2, course_id: 2, section_number: '01', term: 'Spring 2026', instructor: 'Dr. Johnson', building: 'Science Building', room: '205', days: 'Tue/Thu', time: '13:00-14:30', capacity: 25, enrolled: 20, status: 'Open' },
+];
+
+const EMPTY_ACADEMIC_COURSE_FORM: Omit<AcademicCourseRecord, 'course_id'> = {
+  course_code: '',
+  title: '',
+  credits: 3,
+  department: '',
+  description: '',
+};
+
+const EMPTY_ACADEMIC_SECTION_FORM: Omit<AcademicSectionRecord, 'section_id'> = {
+  course_id: 1,
+  section_number: '',
+  term: 'Spring 2026',
+  instructor: '',
+  building: '',
+  room: '',
+  days: '',
+  time: '',
+  capacity: 30,
+  enrolled: 0,
+  status: 'Open',
+};
+
+function AcademicsSection({
+  rooms,
+}: {
+  rooms: RoomData[];
+  selectedRoom?: RoomData | null;
+  onSelectRoom?: (room: RoomData | null) => void;
+}) {
+  const [courses, setCourses] = useState<AcademicCourseRecord[]>(DEFAULT_ACADEMIC_COURSES);
+  const [sections, setSections] = useState<AcademicSectionRecord[]>(DEFAULT_ACADEMIC_SECTIONS);
+  const [courseForm, setCourseForm] = useState(EMPTY_ACADEMIC_COURSE_FORM);
+  const [editingCourseId, setEditingCourseId] = useState<number | null>(null);
+  const [courseFormMessage, setCourseFormMessage] = useState('');
+  const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);
+  const [sectionForm, setSectionForm] = useState(EMPTY_ACADEMIC_SECTION_FORM);
+  const [editingSectionId, setEditingSectionId] = useState<number | null>(null);
+  const [sectionFormMessage, setSectionFormMessage] = useState('');
+  const [sectionDaysSelected, setSectionDaysSelected] = useState<Set<string>>(new Set());
+  const [activeTab, setActiveTab] = useState<'create' | 'manage'>('create');
+
+  const getCourseLabel = (courseId: number): string => {
+    const course = courses.find(c => c.course_id === courseId);
+    return course ? `${course.course_code} · ${course.title}` : 'Unknown';
+  };
+
+  const toggleSectionDay = (day: string) => {
+    const updated = new Set(sectionDaysSelected);
+    if (updated.has(day)) {
+      updated.delete(day);
+    } else {
+      updated.add(day);
+    }
+    setSectionDaysSelected(updated);
+    setSectionForm(prev => ({ ...prev, days: Array.from(updated).sort().join('/') }));
+  };
+
+  const resetCourseForm = () => {
+    setCourseForm(EMPTY_ACADEMIC_COURSE_FORM);
+    setEditingCourseId(null);
+    setCourseFormMessage('');
+    setIsCourseModalOpen(false);
+  };
+
+  const startCourseEdit = (course: AcademicCourseRecord) => {
+    setEditingCourseId(course.course_id);
+    setCourseForm(course);
+    setCourseFormMessage('');
+    setIsCourseModalOpen(true);
+  };
+
+  const handleCourseSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!courseForm.course_code.trim() || !courseForm.title.trim()) {
+      setCourseFormMessage('Course code and title are required.');
+      return;
+    }
+    if (editingCourseId) {
+      setCourses(prev => prev.map(c => c.course_id === editingCourseId ? ({ ...c, ...courseForm }) : c));
+      setCourseFormMessage('Course updated successfully!');
+    } else {
+      setCourses(prev => [...prev, { ...courseForm, course_id: Math.max(...prev.map(c => c.course_id), 0) + 1 }]);
+      setCourseFormMessage('Course created successfully!');
+    }
+    setTimeout(() => resetCourseForm(), 1000);
+  };
+
+  const resetSectionForm = () => {
+    setSectionForm(EMPTY_ACADEMIC_SECTION_FORM);
+    setEditingSectionId(null);
+    setSectionFormMessage('');
+    setSectionDaysSelected(new Set());
+  };
+
+  const startSectionEdit = (section: AcademicSectionRecord) => {
+    setEditingSectionId(section.section_id);
+    setSectionForm(section);
+    setSectionFormMessage('');
+    const dayArray = section.days.split('/').map(d => d.trim());
+    setSectionDaysSelected(new Set(dayArray));
+  };
+
+  const handleSectionSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!sectionForm.course_id || !sectionForm.section_number.trim() || sectionDaysSelected.size === 0) {
+      setSectionFormMessage('Course, section number, and at least one day are required.');
+      return;
+    }
+    if (editingSectionId) {
+      setSections(prev => prev.map(s => s.section_id === editingSectionId ? ({ ...s, ...sectionForm }) : s));
+      setSectionFormMessage('Section updated successfully!');
+    } else {
+      setSections(prev => [...prev, { ...sectionForm, section_id: Math.max(...prev.map(s => s.section_id), 0) + 1 }]);
+      setSectionFormMessage('Section created successfully!');
+    }
+    setTimeout(() => resetSectionForm(), 1000);
+  };
+
+  return (
+    <div className="p-8 max-w-6xl mx-auto space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold" style={{ color: C.primaryDark }}>Academics</h2>
+        <p className="text-sm mt-1" style={{ color: C.mutedBlue }}>Manage courses, sections, and view enrollment data.</p>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+        <StatCard label="Courses" value={String(courses.length)} accent="#0F766E" />
+        <StatCard label="Sections" value={String(sections.length)} accent="#8B5CF6" />
+      </div>
+
+      {/* Tab Navigation */}
+      <div className="flex gap-3">
+        <button
+          onClick={() => setActiveTab('create')}
+          className="px-4 py-3 rounded-lg font-semibold text-sm"
+          style={{
+            backgroundColor: activeTab === 'create' ? C.sidebarBg : 'transparent',
+            color: activeTab === 'create' ? C.cream : C.mutedBlue,
+            border: `2px solid ${activeTab === 'create' ? C.sidebarBg : C.steelBlue}`,
+          }}
+        >
+          CREATE COURSE/SECTION
+        </button>
+        <button
+          onClick={() => setActiveTab('manage')}
+          className="px-4 py-3 rounded-lg font-semibold text-sm"
+          style={{
+            backgroundColor: activeTab === 'manage' ? C.sidebarBg : 'transparent',
+            color: activeTab === 'manage' ? C.cream : C.mutedBlue,
+            border: `2px solid ${activeTab === 'manage' ? C.sidebarBg : C.steelBlue}`,
+          }}
+        >
+          MANAGE COURSES/SECTIONS
+        </button>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-6 min-h-[600px]">
+        {activeTab === 'create' && (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <div>
+              <h3 className="font-bold text-lg mb-4" style={{ color: C.primaryDark }}>Add New Course</h3>
+              <button
+                onClick={() => {
+                  setCourseForm(EMPTY_ACADEMIC_COURSE_FORM);
+                  setEditingCourseId(null);
+                  setCourseFormMessage('');
+                  setIsCourseModalOpen(true);
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold mb-4"
+                style={{ backgroundColor: C.sidebarBg, color: C.cream }}
+              >
+                <Plus size={16} /> New Course
+              </button>
+            </div>
+            
+            <div>
+              <h3 className="font-bold text-lg mb-4" style={{ color: C.primaryDark }}>Create New Section</h3>
+              <form onSubmit={handleSectionSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold mb-2" style={{ color: C.mutedBlue }}>Course</label>
+                  <select
+                    value={sectionForm.course_id}
+                    onChange={e => setSectionForm(prev => ({ ...prev, course_id: Number(e.target.value) }))}
+                    className="w-full px-3 py-2 rounded-lg border text-sm outline-none"
+                    style={{ borderColor: C.steelBlue, color: C.primaryDark }}
+                  >
+                    {courses.map(course => (
+                      <option key={course.course_id} value={course.course_id}>
+                        {course.course_code} · {course.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold mb-2" style={{ color: C.mutedBlue }}>Section #</label>
+                    <input
+                      type="text"
+                      value={sectionForm.section_number}
+                      onChange={e => setSectionForm(prev => ({ ...prev, section_number: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-lg border text-sm outline-none"
+                      style={{ borderColor: C.steelBlue, color: C.primaryDark }}
+                      placeholder="01"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold mb-2" style={{ color: C.mutedBlue }}>Instructor</label>
+                    <input
+                      type="text"
+                      value={sectionForm.instructor}
+                      onChange={e => setSectionForm(prev => ({ ...prev, instructor: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-lg border text-sm outline-none"
+                      style={{ borderColor: C.steelBlue, color: C.primaryDark }}
+                      placeholder="Dr. Smith"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold mb-2" style={{ color: C.mutedBlue }}>Days</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map(day => (
+                      <label key={day} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={sectionDaysSelected.has(day)}
+                          onChange={() => toggleSectionDay(day)}
+                          className="w-4 h-4"
+                        />
+                        <span style={{ color: C.primaryDark }}>{day}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold mb-2" style={{ color: C.mutedBlue }}>Building</label>
+                    <select
+                      value={sectionForm.building}
+                      onChange={e => setSectionForm(prev => ({ ...prev, building: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-lg border text-sm outline-none"
+                      style={{ borderColor: C.steelBlue, color: C.primaryDark }}
+                    >
+                      <option value="">Select building</option>
+                      {Array.from(new Set(rooms.map(r => r.building))).map(b => (
+                        <option key={b} value={b}>{b}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold mb-2" style={{ color: C.mutedBlue }}>Room</label>
+                    <select
+                      value={sectionForm.room}
+                      onChange={e => {
+                        const room = rooms.find(r => r.room === e.target.value && r.building === sectionForm.building);
+                        setSectionForm(prev => ({
+                          ...prev,
+                          room: e.target.value,
+                          capacity: room?.capacity || 30
+                        }));
+                      }}
+                      className="w-full px-3 py-2 rounded-lg border text-sm outline-none"
+                      style={{ borderColor: C.steelBlue, color: C.primaryDark }}
+                    >
+                      <option value="">Select room</option>
+                      {rooms.filter(r => r.building === sectionForm.building).map(r => (
+                        <option key={`${r.building}-${r.room}`} value={r.room}>{r.room} (Cap: {r.capacity})</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold mb-2" style={{ color: C.mutedBlue }}>Time</label>
+                    <select
+                      value={sectionForm.time}
+                      onChange={e => setSectionForm(prev => ({ ...prev, time: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-lg border text-sm outline-none"
+                      style={{ borderColor: C.steelBlue, color: C.primaryDark }}
+                    >
+                      <option value="">Select time</option>
+                      {['08:00-09:30', '09:00-10:15', '09:30-11:00', '10:00-11:30', '11:00-12:15', '11:30-13:00', '13:00-14:15', '13:30-15:00', '14:00-15:30', '15:00-16:30', '16:00-17:30'].map(t => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold mb-2" style={{ color: C.mutedBlue }}>Term</label>
+                    <select
+                      value={sectionForm.term}
+                      onChange={e => setSectionForm(prev => ({ ...prev, term: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-lg border text-sm outline-none"
+                      style={{ borderColor: C.steelBlue, color: C.primaryDark }}
+                    >
+                      {['Spring 2026', 'Summer 2026', 'Fall 2026', 'Winter 2026', 'Spring 2027'].map(t => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {sectionFormMessage && (
+                  <div
+                    className="p-3 rounded-lg text-sm"
+                    style={{
+                      backgroundColor: sectionFormMessage.toLowerCase().includes('success') ? '#dcfce7' : '#fef3c7',
+                      color: sectionFormMessage.toLowerCase().includes('success') ? '#15803d' : '#92400e',
+                    }}
+                  >
+                    {sectionFormMessage}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  className="w-full py-2.5 rounded-lg font-semibold text-sm text-white"
+                  style={{ backgroundColor: C.sidebarBg }}
+                >
+                  {editingSectionId ? 'Update Section' : 'Create Section'}
+                </button>
+                {editingSectionId && (
+                  <button
+                    type="button"
+                    onClick={resetSectionForm}
+                    className="w-full py-2 rounded-lg font-semibold text-sm border"
+                    style={{ borderColor: C.steelBlue, color: C.mutedBlue }}
+                  >
+                    Cancel Edit
+                  </button>
+                )}
+              </form>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'manage' && (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <div>
+              <h3 className="font-bold text-lg mb-4" style={{ color: C.primaryDark }}>Courses ({courses.length})</h3>
+              <div className="space-y-3">
+                {courses.length === 0 ? (
+                  <p style={{ color: C.mutedBlue }}>No courses yet</p>
+                ) : (
+                  courses.map(course => (
+                    <div key={course.course_id} className="rounded-lg border p-3 flex justify-between gap-3" style={{ borderColor: C.steelBlue }}>
+                      <div>
+                        <p style={{ color: C.primaryDark }} className="font-semibold text-sm">{course.course_code}</p>
+                        <p style={{ color: C.mutedBlue }} className="text-xs">{course.title}</p>
+                      </div>
+                      <button
+                        onClick={() => startCourseEdit(course)}
+                        className="px-3 py-1 rounded text-xs font-semibold"
+                        style={{ backgroundColor: C.mutedBlue, color: C.cream }}
+                      >
+                        Edit
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div>
+              <h3 className="font-bold text-lg mb-4" style={{ color: C.primaryDark }}>Sections ({sections.length})</h3>
+              <div className="space-y-3">
+                {sections.length === 0 ? (
+                  <p style={{ color: C.mutedBlue }}>No sections yet</p>
+                ) : (
+                  sections.map(section => (
+                    <div key={section.section_id} className="rounded-lg border p-3 flex justify-between gap-3" style={{ borderColor: C.steelBlue }}>
+                      <div>
+                        <p style={{ color: C.primaryDark }} className="font-semibold text-sm">{getCourseLabel(section.course_id)} - Sec {section.section_number}</p>
+                        <p style={{ color: C.mutedBlue }} className="text-xs">{section.days} · {section.time}</p>
+                      </div>
+                      <button
+                        onClick={() => startSectionEdit(section)}
+                        className="px-3 py-1 rounded text-xs font-semibold"
+                        style={{ backgroundColor: C.mutedBlue, color: C.cream }}
+                      >
+                        Edit
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Course Modal */}
+      <AnimatePresence>
+        {isCourseModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => resetCourseForm()}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={e => e.stopPropagation()}
+              className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold" style={{ color: C.primaryDark }}>
+                  {editingCourseId ? 'Edit Course' : 'Create Course'}
+                </h2>
+                <button type="button" onClick={() => resetCourseForm()} className="p-1 rounded-lg hover:bg-gray-100">
+                  <X size={20} style={{ color: C.mutedBlue }} />
+                </button>
+              </div>
+
+              <form onSubmit={handleCourseSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold mb-2" style={{ color: C.primaryDark }}>Course Code *</label>
+                  <input
+                    type="text"
+                    value={courseForm.course_code}
+                    onChange={e => setCourseForm(prev => ({ ...prev, course_code: e.target.value }))}
+                    className="w-full px-4 py-2.5 rounded-lg border text-sm outline-none"
+                    style={{ borderColor: C.steelBlue, color: C.primaryDark }}
+                    placeholder="CSC 101"
+                    autoFocus
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold mb-2" style={{ color: C.primaryDark }}>Title *</label>
+                  <input
+                    type="text"
+                    value={courseForm.title}
+                    onChange={e => setCourseForm(prev => ({ ...prev, title: e.target.value }))}
+                    className="w-full px-4 py-2.5 rounded-lg border text-sm outline-none"
+                    style={{ borderColor: C.steelBlue, color: C.primaryDark }}
+                    placeholder="Introduction to Programming"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold mb-2" style={{ color: C.primaryDark }}>Credits *</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={6}
+                    value={courseForm.credits}
+                    onChange={e => setCourseForm(prev => ({ ...prev, credits: Number(e.target.value) }))}
+                    className="w-full px-4 py-2.5 rounded-lg border text-sm outline-none"
+                    style={{ borderColor: C.steelBlue, color: C.primaryDark }}
+                  />
+                </div>
+
+                {courseFormMessage && (
+                  <div
+                    className="p-3 rounded-lg text-sm"
+                    style={{
+                      backgroundColor: courseFormMessage.toLowerCase().includes('success') ? '#dcfce7' : '#fef3c7',
+                      color: courseFormMessage.toLowerCase().includes('success') ? '#15803d' : '#92400e',
+                    }}
+                  >
+                    {courseFormMessage}
+                  </div>
+                )}
+
+                <div className="flex gap-3 pt-4">
+                  <button type="submit" className="flex-1 py-2.5 rounded-lg font-semibold text-sm text-white" style={{ backgroundColor: C.sidebarBg }}>
+                    {editingCourseId ? 'Save Course' : 'Create Course'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => resetCourseForm()}
+                    className="px-4 py-2.5 rounded-lg font-semibold text-sm border"
+                    style={{ borderColor: C.steelBlue, color: C.mutedBlue }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
