@@ -1,2 +1,5 @@
 flask
 gunicorn
+pymongo
+flask-cors
+mysql-connector-python

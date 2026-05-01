@@ -272,11 +272,12 @@ const getDormFromDepartment = (department?: string): string => {
 // ─── root component ───────────────────────────────────────────────────────────
 export default function App({ onBackToPortal }: { onBackToPortal?: () => void }) {
   const [isLoggedIn,    setIsLoggedIn]    = useState(false);
-  const [useMockAuth,   setUseMockAuth]   = useState(true);
   const [email,         setEmail]         = useState('');
   const [password,      setPassword]      = useState('');
   const [authPassword,  setAuthPassword]  = useState('');
   const [currentUser,   setCurrentUser]   = useState<CurrentUser | null>(null);
+  const [users,         setUsers]         = useState<CurrentUser[]>([]);
+  const [rooms,         setRooms]         = useState<RoomData[]>([]);
   const [loginError,    setLoginError]    = useState('');
   const [activeSection, setActiveSection] = useState<Section>('home');
   const [passwordError, setPasswordError] = useState('');
@@ -321,12 +322,6 @@ export default function App({ onBackToPortal }: { onBackToPortal?: () => void })
 
   // ── ticket helpers ────────────────────────────────────────────────────────
   const fetchTickets = async () => {
-    if (useMockAuth) {
-      setTicketError('');
-      setTickets(MOCK_TICKETS);
-      return;
-    }
-
     try {
       setIsLoadingTickets(true);
       setTicketError('');
@@ -342,16 +337,6 @@ export default function App({ onBackToPortal }: { onBackToPortal?: () => void })
   };
 
   const fetchMaintenanceStaff = async () => {
-    if (useMockAuth) {
-      const mockNames = Array.from(new Set([
-        ...MOCK_USERS.filter(isFacilitiesStaff).map(toDisplayName).filter(Boolean),
-        ...MOCK_TICKETS.map(t => (t.assignee || '').trim()).filter(Boolean),
-      ]));
-      setStaffError('');
-      setMaintenanceStaff(mockNames);
-      return;
-    }
-
     const parseNames = (payload: unknown): string[] => {
       const rows = Array.isArray(payload)
         ? payload
@@ -400,13 +385,42 @@ export default function App({ onBackToPortal }: { onBackToPortal?: () => void })
     }
   };
 
-  const fetchLostCards = async () => {
-    if (useMockAuth) {
-      setCardError('');
-      setLostCards(MOCK_LOST_ID_CARDS);
-      return;
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch(`${API_URL}/retrieve-users`);
+      if (!res.ok) throw new Error(`Failed to fetch users: ${res.status}`);
+      const data = await res.json();
+      setUsers(Array.isArray(data) ? data : []);
+    } catch {
+      setUsers(currentUser ? [currentUser] : []);
     }
+  };
 
+  const fetchRooms = async () => {
+    try {
+      const res = await fetch(`${API_URL}/get-rooms`);
+      if (!res.ok) throw new Error(`Failed to fetch rooms: ${res.status}`);
+      const data = await res.json();
+      const mappedRooms = (Array.isArray(data) ? data : []).reduce<RoomData[]>((acc, row) => {
+        if (!row || typeof row !== 'object') return acc;
+        const building = String((row as { building?: string }).building || '').trim();
+        const room = String((row as { room?: string }).room || '').trim();
+        if (!building || !room) return acc;
+        acc.push({
+          building,
+          room,
+          capacity: Number((row as { capacity?: number }).capacity || 0),
+          schedule: [],
+        });
+        return acc;
+      }, []);
+      setRooms(mappedRooms);
+    } catch {
+      setRooms([]);
+    }
+  };
+
+  const fetchLostCards = async () => {
     try {
       setIsLoadingCards(true);
       setCardError('');
@@ -422,12 +436,6 @@ export default function App({ onBackToPortal }: { onBackToPortal?: () => void })
   };
 
   const fetchAccessLogs = async () => {
-    if (useMockAuth) {
-      setLogsError('');
-      setAccessLogs(MOCK_ACCESS_LOGS);
-      return;
-    }
-
     try {
       setIsLoadingLogs(true);
       setLogsError('');
@@ -442,19 +450,27 @@ export default function App({ onBackToPortal }: { onBackToPortal?: () => void })
     }
   };
 
-  useEffect(() => { if (isLoggedIn) fetchTickets(); }, [isLoggedIn, useMockAuth]);
+  useEffect(() => { if (isLoggedIn) fetchTickets(); }, [isLoggedIn]);
 
   useEffect(() => {
     if (isLoggedIn) fetchMaintenanceStaff();
-  }, [isLoggedIn, useMockAuth]);
+  }, [isLoggedIn]);
 
   useEffect(() => {
     if (isLoggedIn) fetchLostCards();
-  }, [isLoggedIn, useMockAuth]);
+  }, [isLoggedIn]);
 
   useEffect(() => {
     if (isLoggedIn) fetchAccessLogs();
-  }, [isLoggedIn, useMockAuth]);
+  }, [isLoggedIn]);
+
+  useEffect(() => {
+    if (isLoggedIn) fetchUsers();
+  }, [isLoggedIn]);
+
+  useEffect(() => {
+    if (isLoggedIn) fetchRooms();
+  }, [isLoggedIn]);
 
   useEffect(() => {
     if (isLoggedIn && activeSection !== 'password' && !allowedSections.includes(activeSection)) {
@@ -483,19 +499,13 @@ export default function App({ onBackToPortal }: { onBackToPortal?: () => void })
       return;
     }
 
-    if (useMockAuth) {
-      setAuthPassword(nextPassword);
-      setPasswordSuccess('Password changed successfully.');
-      return;
-    }
-
     try {
       setIsChangingPassword(true);
       const res = await fetch(`${API_URL}/change-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: currentUser?.email,
+          user_id: currentUser?.user_id,
           current_password: currentPassword,
           new_password: nextPassword,
         }),
@@ -532,7 +542,7 @@ export default function App({ onBackToPortal }: { onBackToPortal?: () => void })
     const normalizedRoom = roomQuery.trim().toLowerCase();
     if (!building || !normalizedRoom) return false;
 
-    const found = ROOM_DIRECTORY.find(r => (
+    const found = rooms.find(r => (
       r.building === building && r.room.toLowerCase() === normalizedRoom
     ));
 
@@ -547,46 +557,6 @@ export default function App({ onBackToPortal }: { onBackToPortal?: () => void })
 
     if (!formBuilding || !formRoom) {
       setTicketError('Please select both building and room.');
-      return;
-    }
-
-    if (useMockAuth) {
-      const nextId = tickets.length > 0 ? Math.max(...tickets.map(t => t.id)) + 1 : 1;
-      if (editingTicket) {
-        setTickets(prev => prev.map(t => (
-          t.id === editingTicket.id
-            ? {
-              ...t,
-              title: formTitle,
-              status: formStatus,
-              priority: formPriority,
-              assignee: formAssignee,
-              actionNotes: formActionNotes,
-              building: formBuilding,
-              room: formRoom,
-            }
-            : t
-        )));
-      } else {
-        const newTicket: TicketData = {
-          id: nextId,
-          user_id: currentUser?.user_id || 1,
-          department: currentDepartment || 'Maintenance',
-          title: formTitle,
-          status: formStatus,
-          priority: formPriority,
-          assignee: formAssignee,
-          actionNotes: formActionNotes,
-          building: formBuilding,
-          room: formRoom,
-          dateSubmitted: new Date().toISOString().split('T')[0],
-        };
-        setTickets(prev => [newTicket, ...prev]);
-      }
-      setIsModalOpen(false); setEditingTicket(null);
-      setFormTitle(''); setFormStatus('Pending'); setFormPriority('Medium');
-      setFormAssignee(''); setFormActionNotes('');
-      setFormBuilding(''); setFormRoom('');
       return;
     }
 
@@ -635,12 +605,6 @@ export default function App({ onBackToPortal }: { onBackToPortal?: () => void })
   };
 
   const handleDeleteTicket = async (id: number) => {
-    if (useMockAuth) {
-      setTicketError('');
-      setTickets(prev => prev.filter(t => t.id !== id));
-      return;
-    }
-
     try {
       setTicketError('');
       const res = await fetch(`${API_URL}/tickets/${id}`, { method: 'DELETE' });
@@ -654,24 +618,6 @@ export default function App({ onBackToPortal }: { onBackToPortal?: () => void })
   // ── auth ──────────────────────────────────────────────────────────────────
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (useMockAuth) {
-      setLoginError('');
-      const found = MOCK_USERS.find(u => u.email.toLowerCase() === email.trim().toLowerCase());
-      const fallbackName = email.trim().split('@')[0] || 'Demo';
-      const mockUser: CurrentUser = found || {
-        user_id: 999,
-        first_name: fallbackName.charAt(0).toUpperCase() + fallbackName.slice(1),
-        last_name: 'User',
-        email: email.trim() || 'demo@campus.demo',
-        department: 'Housing',
-      };
-      setCurrentUser(mockUser);
-      setIsLoggedIn(true);
-      setAuthPassword(password);
-      setActiveSection(getRoleSections(getCurrentDepartment(mockUser))[0] || 'home');
-      return;
-    }
 
     try {
       setLoginError('');
@@ -687,6 +633,7 @@ export default function App({ onBackToPortal }: { onBackToPortal?: () => void })
         department: data.user?.department ?? data.user?.role,
       };
       setCurrentUser(normalizedUser);
+      setUsers([normalizedUser]);
       setIsLoggedIn(true);
       setAuthPassword(password);
       setActiveSection(getRoleSections(getCurrentDepartment(normalizedUser))[0] || 'home');
@@ -698,7 +645,7 @@ export default function App({ onBackToPortal }: { onBackToPortal?: () => void })
   const handleLogout = () => {
     setIsLoggedIn(false); setEmail(''); setPassword('');
     setAuthPassword('');
-    setCurrentUser(null); setTickets([]); setTicketError(''); setLoginError('');
+    setCurrentUser(null); setUsers([]); setRooms([]); setTickets([]); setTicketError(''); setLoginError('');
     setPasswordError(''); setPasswordSuccess('');
     setActiveSection('home');
     if (onBackToPortal) {
@@ -735,16 +682,10 @@ export default function App({ onBackToPortal }: { onBackToPortal?: () => void })
           <form onSubmit={handleLogin} className="space-y-6">
             <div className="p-3 rounded-lg border" style={{ borderColor: C.steelBlue }}>
               <label className="flex items-center justify-between gap-3 text-sm" style={{ color: C.cream }}>
-                <span>Use mock login (no backend required)</span>
-                <input
-                  type="checkbox"
-                  checked={useMockAuth}
-                  onChange={e => setUseMockAuth(e.target.checked)}
-                  className="h-4 w-4"
-                />
+                <span>Backend authentication</span>
               </label>
               <p className="text-xs mt-1" style={{ color: C.steelBlue }}>
-                Keep this on to preview UI design without full authentication.
+                Sign in against the live backend API.
               </p>
             </div>
 
@@ -761,33 +702,11 @@ export default function App({ onBackToPortal }: { onBackToPortal?: () => void })
               <label className="block text-sm font-medium mb-2" style={{ color: C.steelBlue }}>Password</label>
               <input
                 type="password" value={password} onChange={e => setPassword(e.target.value)} required
-                placeholder={useMockAuth ? 'Any password works in mock mode' : 'Enter your password'}
+                placeholder="Enter your password"
                 className="w-full px-4 py-3 rounded-lg bg-transparent border outline-none"
                 style={{ borderColor: C.steelBlue, color: C.cream }}
               />
             </div>
-
-            {useMockAuth && (
-              <div>
-                <p className="text-xs mb-2" style={{ color: C.steelBlue }}>Quick demo users:</p>
-                <div className="flex flex-wrap gap-2">
-                  {MOCK_USERS.map(u => (
-                    <button
-                      key={u.user_id}
-                      type="button"
-                      onClick={() => {
-                        setEmail(u.email);
-                        setPassword('demo');
-                      }}
-                      className="px-3 py-1.5 rounded-full text-xs border"
-                      style={{ borderColor: C.steelBlue, color: C.cream }}
-                    >
-                      {u.first_name} ({u.department})
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
 
             <button
               type="submit"
@@ -800,9 +719,7 @@ export default function App({ onBackToPortal }: { onBackToPortal?: () => void })
 
           {loginError && <p className="mt-4 text-sm text-red-400 text-center">{loginError}</p>}
           <p className="mt-8 text-center text-sm" style={{ color: C.steelBlue }}>
-            {useMockAuth
-              ? 'Mock mode is active: use any password and preview the full UI.'
-              : 'Live mode: authenticates against the backend /login route.'}
+            Live mode: authenticates against the backend /login route.
           </p>
         </motion.div>
       </div>
@@ -816,7 +733,7 @@ export default function App({ onBackToPortal }: { onBackToPortal?: () => void })
         return (
           <HomeSection
             tickets={visibleTickets}
-            rooms={ROOM_DIRECTORY}
+            rooms={rooms}
             unsolvedCount={unsolvedCount}
             inProgressCount={inProgressCount}
             completedCount={completedCount}
@@ -842,21 +759,21 @@ export default function App({ onBackToPortal }: { onBackToPortal?: () => void })
       case 'housing':
         return (
           <HousingManagementSection
-            requests={MOCK_HOUSING_REQUESTS}
-            beds={MOCK_BEDS}
+            requests={[]}
+            beds={[]}
             currentUser={currentUser}
           />
         );
       case 'accounts':
         return (
           <AccountManagementSection
-            users={useMockAuth ? MOCK_USERS : (currentUser ? [currentUser] : [])}
+            users={users}
           />
         );
       case 'buildings':
         return (
           <BuildingManagementSection
-            rooms={ROOM_DIRECTORY}
+            rooms={rooms}
             selectedRoom={selectedRoom}
             onSelectRoom={setSelectedRoom}
           />
@@ -877,7 +794,7 @@ export default function App({ onBackToPortal }: { onBackToPortal?: () => void })
       case 'academics':
         return (
           <AcademicsSection
-            rooms={ROOM_DIRECTORY}
+            rooms={rooms}
             selectedRoom={selectedRoom}
             onSelectRoom={setSelectedRoom}
           />
@@ -1816,20 +1733,36 @@ function AccountManagementSection({ users }: { users: CurrentUser[] }) {
     setNewDepartmentDraft('');
   };
 
-  const saveAssignedDepartment = () => {
+  const saveAssignedDepartment = async () => {
     if (!selectedUserForDepartment) return;
     if (!departmentDraft.trim()) {
       setDepartmentNotice('Please choose or add a department.');
       return;
     }
 
-    setLocalUsers(prev => prev.map(u => (
-      u.user_id === selectedUserForDepartment.user_id
-        ? { ...u, department: departmentDraft.trim() }
-        : u
-    )));
-    setDepartments(prev => (prev.includes(departmentDraft.trim()) ? prev : [...prev, departmentDraft.trim()]));
-    closeDepartmentModal();
+    try {
+      setDepartmentNotice('');
+      const res = await fetch(`${API_URL}/update-department`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: selectedUserForDepartment.user_id,
+          new_department: departmentDraft.trim(),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not update department');
+
+      setLocalUsers(prev => prev.map(u => (
+        u.user_id === selectedUserForDepartment.user_id
+          ? { ...u, department: departmentDraft.trim() }
+          : u
+      )));
+      setDepartments(prev => (prev.includes(departmentDraft.trim()) ? prev : [...prev, departmentDraft.trim()]));
+      closeDepartmentModal();
+    } catch (err) {
+      setDepartmentNotice(err instanceof Error ? err.message : 'Could not update department.');
+    }
   };
 
   const openPasswordModal = (user: CurrentUser) => {
@@ -1849,19 +1782,35 @@ function AccountManagementSection({ users }: { users: CurrentUser[] }) {
     setPasswordNotice(`Password reset to last name: ${selectedUserForPassword.last_name}`);
   };
 
-  const saveUserPassword = () => {
+  const saveUserPassword = async () => {
     if (!selectedUserForPassword) return;
     if (!passwordDraft.trim()) {
       setPasswordNotice('Password cannot be empty.');
       return;
     }
 
-    setUserPasswords(prev => ({
-      ...prev,
-      [selectedUserForPassword.user_id]: passwordDraft,
-    }));
-    setPasswordNotice('Password updated successfully.');
-    closePasswordModal();
+    try {
+      setPasswordNotice('');
+      const res = await fetch(`${API_URL}/update-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: selectedUserForPassword.user_id,
+          new_password: passwordDraft,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not update password');
+
+      setUserPasswords(prev => ({
+        ...prev,
+        [selectedUserForPassword.user_id]: passwordDraft,
+      }));
+      setPasswordNotice('Password updated successfully.');
+      closePasswordModal();
+    } catch (err) {
+      setPasswordNotice(err instanceof Error ? err.message : 'Could not update password.');
+    }
   };
 
   return (
@@ -2132,7 +2081,7 @@ function AccountManagementSection({ users }: { users: CurrentUser[] }) {
 
       {Object.keys(userPasswords).length > 0 && (
         <p className="text-xs mt-3" style={{ color: C.mutedBlue }}>
-          {Object.keys(userPasswords).length} user password{Object.keys(userPasswords).length !== 1 ? 's' : ''} updated in mock mode.
+          {Object.keys(userPasswords).length} user password{Object.keys(userPasswords).length !== 1 ? 's' : ''} updated.
         </p>
       )}
     </div>
@@ -2246,16 +2195,6 @@ interface AcademicSectionRecord {
   status: 'Open' | 'Closed' | 'Waitlist';
 }
 
-const DEFAULT_ACADEMIC_COURSES: AcademicCourseRecord[] = [
-  { course_id: 1, course_code: 'CSC 101', title: 'Introduction to Programming', credits: 3, department: 'Computer Science', description: 'Foundations of programming' },
-  { course_id: 2, course_code: 'MAT 210', title: 'Discrete Mathematics', credits: 3, department: 'Mathematics', description: 'Logic and sets' },
-];
-
-const DEFAULT_ACADEMIC_SECTIONS: AcademicSectionRecord[] = [
-  { section_id: 1, course_id: 1, section_number: '01', term: 'Spring 2026', instructor: 'Dr. Smith', building: 'Engineering Hall', room: '101', days: 'Mon/Wed/Fri', time: '09:00-10:15', capacity: 30, enrolled: 28, status: 'Open' },
-  { section_id: 2, course_id: 2, section_number: '01', term: 'Spring 2026', instructor: 'Dr. Johnson', building: 'Science Building', room: '205', days: 'Tue/Thu', time: '13:00-14:30', capacity: 25, enrolled: 20, status: 'Open' },
-];
-
 const EMPTY_ACADEMIC_COURSE_FORM: Omit<AcademicCourseRecord, 'course_id'> = {
   course_code: '',
   title: '',
@@ -2285,8 +2224,8 @@ function AcademicsSection({
   selectedRoom?: RoomData | null;
   onSelectRoom?: (room: RoomData | null) => void;
 }) {
-  const [courses, setCourses] = useState<AcademicCourseRecord[]>(DEFAULT_ACADEMIC_COURSES);
-  const [sections, setSections] = useState<AcademicSectionRecord[]>(DEFAULT_ACADEMIC_SECTIONS);
+  const [courses, setCourses] = useState<AcademicCourseRecord[]>([]);
+  const [sections, setSections] = useState<AcademicSectionRecord[]>([]);
   const [courseForm, setCourseForm] = useState(EMPTY_ACADEMIC_COURSE_FORM);
   const [editingCourseId, setEditingCourseId] = useState<number | null>(null);
   const [courseFormMessage, setCourseFormMessage] = useState('');
@@ -2296,6 +2235,28 @@ function AcademicsSection({
   const [sectionFormMessage, setSectionFormMessage] = useState('');
   const [sectionDaysSelected, setSectionDaysSelected] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<'create' | 'manage'>('create');
+
+  useEffect(() => {
+    const loadAcademics = async () => {
+      try {
+        const [courseRes, sectionRes] = await Promise.all([
+          fetch(`${API_URL}/courses`),
+          fetch(`${API_URL}/sections`),
+        ]);
+
+        const courseData = courseRes.ok ? await courseRes.json() : [];
+        const sectionData = sectionRes.ok ? await sectionRes.json() : [];
+
+        setCourses(Array.isArray(courseData) ? courseData : []);
+        setSections(Array.isArray(sectionData) ? sectionData : []);
+      } catch {
+        setCourses([]);
+        setSections([]);
+      }
+    };
+
+    loadAcademics();
+  }, []);
 
   const getCourseLabel = (courseId: number): string => {
     const course = courses.find(c => c.course_id === courseId);
@@ -2327,18 +2288,29 @@ function AcademicsSection({
     setIsCourseModalOpen(true);
   };
 
-  const handleCourseSubmit = (e: React.FormEvent) => {
+  const handleCourseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!courseForm.course_code.trim() || !courseForm.title.trim()) {
       setCourseFormMessage('Course code and title are required.');
       return;
     }
-    if (editingCourseId) {
-      setCourses(prev => prev.map(c => c.course_id === editingCourseId ? ({ ...c, ...courseForm }) : c));
-      setCourseFormMessage('Course updated successfully!');
-    } else {
-      setCourses(prev => [...prev, { ...courseForm, course_id: Math.max(...prev.map(c => c.course_id), 0) + 1 }]);
-      setCourseFormMessage('Course created successfully!');
+    try {
+      const res = await fetch(
+        editingCourseId ? `${API_URL}/courses/${editingCourseId}` : `${API_URL}/courses`,
+        {
+          method: editingCourseId ? 'PUT' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(courseForm),
+        },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not save course');
+      setCourseFormMessage(editingCourseId ? 'Course updated successfully!' : 'Course created successfully!');
+      const refreshed = await fetch(`${API_URL}/courses`);
+      setCourses(await refreshed.json().catch(() => []));
+    } catch (err) {
+      setCourseFormMessage(err instanceof Error ? err.message : 'Could not save course.');
+      return;
     }
     setTimeout(() => resetCourseForm(), 1000);
   };
@@ -2358,18 +2330,29 @@ function AcademicsSection({
     setSectionDaysSelected(new Set(dayArray));
   };
 
-  const handleSectionSubmit = (e: React.FormEvent) => {
+  const handleSectionSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!sectionForm.course_id || !sectionForm.section_number.trim() || sectionDaysSelected.size === 0) {
       setSectionFormMessage('Course, section number, and at least one day are required.');
       return;
     }
-    if (editingSectionId) {
-      setSections(prev => prev.map(s => s.section_id === editingSectionId ? ({ ...s, ...sectionForm }) : s));
-      setSectionFormMessage('Section updated successfully!');
-    } else {
-      setSections(prev => [...prev, { ...sectionForm, section_id: Math.max(...prev.map(s => s.section_id), 0) + 1 }]);
-      setSectionFormMessage('Section created successfully!');
+    try {
+      const res = await fetch(
+        editingSectionId ? `${API_URL}/sections/${editingSectionId}` : `${API_URL}/sections`,
+        {
+          method: editingSectionId ? 'PUT' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(sectionForm),
+        },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not save section');
+      setSectionFormMessage(editingSectionId ? 'Section updated successfully!' : 'Section created successfully!');
+      const refreshed = await fetch(`${API_URL}/sections`);
+      setSections(await refreshed.json().catch(() => []));
+    } catch (err) {
+      setSectionFormMessage(err instanceof Error ? err.message : 'Could not save section.');
+      return;
     }
     setTimeout(() => resetSectionForm(), 1000);
   };
