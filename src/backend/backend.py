@@ -658,6 +658,124 @@ def login():
             cursor.close()
         if connection and connection.is_connected():
             connection.close()
+
+# --------------------------
+# HOUSING
+# --------------------------
+@app.route("/housing", methods=["GET"])
+def get_housing():
+    connection = None
+    cursor = None
+    try:
+        user_id = request.args.get("user_id")
+        if not user_id:
+            return error_response("Missing user_id", 400)
+
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+
+        query = """
+        SELECT
+            hc.contract_id,
+            d.dorm_name AS dorm,
+            r.room_number AS room,
+            r.room_type,
+            hc.start_date,
+            hc.end_date,
+            'Active' AS status
+        FROM HousingContract hc
+        JOIN Student s   ON hc.student_id = s.student_id
+        JOIN Room r      ON hc.room_id    = r.room_id
+        JOIN Dorm d      ON r.dorm_id     = d.dorm_id
+        WHERE s.user_id = %s
+        LIMIT 1
+        """
+        cursor.execute(query, (user_id,))
+        result = cursor.fetchone()
+        return success_response(result if result else {})
+
+    except Error as e:
+        return error_response(str(e))
+
+    finally:
+        if cursor:
+            cursor.close()
+        if connection and connection.is_connected():
+            connection.close()
+
+
+@app.route("/housing/assign", methods=["POST"])
+def assign_housing():
+    connection = None
+    cursor = None
+    try:
+        data = request.get_json()
+        if not data:
+            return error_response("Request body must be JSON", 400)
+
+        user_id       = data.get("user_id")
+        dorm_pref     = data.get("dorm_preference")
+        room_type     = data.get("room_type", "Single")
+
+        if not user_id:
+            return error_response("Missing user_id", 400)
+
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+
+        # get student_id from user_id
+        cursor.execute(
+            "SELECT student_id FROM Student WHERE user_id = %s", (user_id,)
+        )
+        student = cursor.fetchone()
+        if not student:
+            return error_response("Student not found", 404)
+
+        student_id = student["student_id"]
+
+        # check if student already has a contract
+        cursor.execute(
+            "SELECT contract_id FROM HousingContract WHERE student_id = %s", (student_id,)
+        )
+        if cursor.fetchone():
+            return error_response("Student already has a housing contract", 409)
+
+        # find an available room matching their preference
+        cursor.execute("""
+            SELECT r.room_id
+            FROM Room r
+            JOIN Dorm d ON r.dorm_id = d.dorm_id
+            LEFT JOIN HousingContract hc ON r.room_id = hc.room_id
+            WHERE hc.room_id IS NULL
+              AND r.room_type = %s
+              AND (%s IS NULL OR d.dorm_name = %s)
+            LIMIT 1
+        """, (room_type, dorm_pref, dorm_pref))
+        room = cursor.fetchone()
+
+        if not room:
+            return error_response("No available rooms matching your preference", 404)
+
+        # create the contract
+        cursor.execute("""
+            INSERT INTO HousingContract (student_id, room_id, start_date, end_date)
+            VALUES (%s, %s, '2026-08-15', '2027-05-30')
+        """, (student_id, room["room_id"]))
+        connection.commit()
+
+        return success_response({"message": "Housing contract created successfully"}, 201)
+
+    except Error as e:
+        if connection and connection.is_connected():
+            connection.rollback()
+        return error_response(str(e))
+
+    finally:
+        if cursor:
+            cursor.close()
+        if connection and connection.is_connected():
+            connection.close()
+
 # --------------------------
 # RUN APP
 # --------------------------

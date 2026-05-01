@@ -204,7 +204,7 @@ export default function StudentApp({ onBackToPortal }: StudentAppProps) {
   const [housingModal, setHousingModal] = useState(false);
   const [dormPreference, setDormPreference] = useState("");
   const [roomType, setRoomType] = useState("Single");
-  const [mockMode, setMockMode] = useState(true);
+  const [mockMode, setMockMode] = useState(false);
 
   // fetch all the student data once they log in
   const fetchStudentData = async (user_id: number) => {
