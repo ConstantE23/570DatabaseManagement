@@ -17,7 +17,6 @@ https://www.anthropic.com
 
 */
 
-/*
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
@@ -35,9 +34,9 @@ function Root()
 }
 
 createRoot(document.getElementById('root')!).render(<Root/>);
-*/
 
 
+/*
 //code that does not break but is not ideal
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -49,7 +48,7 @@ createRoot(document.getElementById('root')!).render(
     <StudentApp />
   </StrictMode>,
 );
-
+*/
 
 
 
