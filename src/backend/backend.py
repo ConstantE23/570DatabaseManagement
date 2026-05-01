@@ -45,7 +45,8 @@ def home():
             "/enrollments",
             "/tickets",
             "/tickets/<id>",
-            "/add-student"
+            "/add-student",
+            "/logs"
         ]
     })
 
@@ -716,8 +717,7 @@ def log_activity(user_id, action_name, result="Success"):
         cursor = connection.cursor()
 
         query = """
-                INSERT INTO Log (user_id, action, time, result)
-                VALUES (%s, %s, NOW(), %s) \
+                INSERT INTO Log (user_id, action, time, result) VALUES (%s, %s, NOW(), %s) \
                 """
         cursor.execute(query, (user_id, action_name, result))
         connection.commit()
