@@ -16,10 +16,6 @@ Anthropic. (2026). Claude (Version Sonnet 4.6) [Large language model].
 https://www.anthropic.com
 
 */
-
-
-code breaks website
-
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
