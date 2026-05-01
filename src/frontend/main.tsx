@@ -17,7 +17,7 @@ https://www.anthropic.com
 
 */
 
-/*
+
 THIS CODE WONT LET MY POTRAL SHOW
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -36,9 +36,9 @@ function Root()
 }
 
 createRoot(document.getElementById('root')!).render(<Root/>);
-*/
 
 
+/*
 //code that does not break but is not ideal
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -50,6 +50,7 @@ createRoot(document.getElementById('root')!).render(
     <StudentApp />
   </StrictMode>,
 );
+*/
 
 
 

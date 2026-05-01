@@ -25,7 +25,7 @@ const COLORS = {
   skyBlue: '#BAE6FD',
 };
 
-const API_URL = 'http://127.0.0.1:5001';
+const API_URL = 'http://4.239.243.37:5001';
 
 interface TicketData {
   id: number;
