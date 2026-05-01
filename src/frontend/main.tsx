@@ -17,45 +17,29 @@ https://www.anthropic.com
 
 */
 
-/*
+
 code breaks website
 
-import {useState} from 'react';
-import {createRoot} from 'react-dom/client';
+import { useState } from 'react';
+import { createRoot } from 'react-dom/client';
 import App from './App';
 import StudentApp from './StudentApp';
+import './index.css';
 
 function Root()
 {
- const [portal, setPortal] = useState <'staff' | 'student' | null > (null);
- 
- //check which portal the user chose
- if (portal === 'staff')
-  return <App/>;
- if(portal === 'student')
-  return <StudentApp/>;
+  const [portal, setPortal] = useState<'staff' | 'student'>('staff');
 
- return
- (
- <div style={{ backgroundColor: '#0D1321', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
-      <h1 style={{ color: '#F0EBD8', fontSize: '28px', marginBottom: '8px' }}>Smart Campus</h1>
-      <p style={{ color: '#748CAB', marginBottom: '40px', fontSize: '14px' }}>Select your portal to continue</p>
-      <div style={{ display: 'flex', gap: '16px' }}>
-        <button onClick={() => setPortal('staff')}
-          style={{ padding: '16px 32px', backgroundColor: '#3E5C76', color: '#F0EBD8', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer' }}>
-          Staff Portal
-        </button>
-        <button onClick={() => setPortal('student')}
-          style={{ padding: '16px 32px', backgroundColor: '#3E5C76', color: '#F0EBD8', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer' }}>
-          Student Portal
-        </button>
-      </div>
-    </div>
-  );
+  if (portal === 'student')
+    return <StudentApp onBackToPortal={() => setPortal('staff')} />;
+
+  return <App />;
 }
-createRoot(document.getElementById('root')!).render(<Root/>);
-*/
 
+createRoot(document.getElementById('root')!).render(<Root/>);
+
+
+/*
 //code that does not break but is not ideal
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -67,7 +51,7 @@ createRoot(document.getElementById('root')!).render(
     <StudentApp />
   </StrictMode>,
 );
-
+*/
 
 
 
