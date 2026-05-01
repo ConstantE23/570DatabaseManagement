@@ -472,6 +472,7 @@ def create_ticket():
 
         connection.commit()
 
+        log_activity(user_id, "Created Maintenance Ticket", "Success")
         return success_response({
             "message": "Ticket created successfully",
             "ticket_id": cursor.lastrowid
@@ -605,13 +606,13 @@ def get_tickets_by_user(user_id):
             cursor.close()
         if connection and connection.is_connected():
             connection.close()
+
 @app.route("/login", methods=["POST"])
 def login():
     connection = None
     cursor = None
     try:
         data = request.get_json()
-
         if not data:
             return error_response("Request body must be JSON", 400)
 
@@ -624,24 +625,26 @@ def login():
         connection = get_db_connection()
         cursor = connection.cursor(dictionary=True)
 
-        # Demo login:
-        # email must match, and password must equal the user's last_name
-        query = """
-        SELECT user_id, first_name, last_name, email
-        FROM `User`
-        WHERE email = %s
-        """
+        # 1. Fetch user
+        query = "SELECT user_id, first_name, last_name, email FROM `User` WHERE email = %s"
         cursor.execute(query, (email,))
         user = cursor.fetchone()
 
-        if not user:
+        # 2. Validate user and "password" (last_name)
+        if not user or password != user["last_name"]:
             return error_response("Invalid email or password", 401)
 
-        if password != user["last_name"]:
-            return error_response("Invalid email or password", 401)
+        # 3. Check role (Fixed Indentation)
+        cursor.execute("SELECT staff_id FROM Staff WHERE user_id = %s", (user["user_id"],))
+        staff_record = cursor.fetchone()
+        role = "staff" if staff_record else "student"
 
+        # 4. Log and Respond
+        log_activity(user_id=user["user_id"], action_name="Login")
+        
         return success_response({
             "message": "Login successful",
+            "role": role, # Good to include the role in the response
             "user": {
                 "user_id": user["user_id"],
                 "first_name": user["first_name"],
@@ -650,8 +653,8 @@ def login():
             }
         }, 200)
 
-    except Error as e:
-        return error_response(str(e))
+    except Exception as e: # Catching general exceptions unless 'Error' is imported
+        return error_response(str(e), 500)
 
     finally:
         if cursor:

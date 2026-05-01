@@ -24,6 +24,7 @@ import {
   Search,
   Filter,
   X,
+  ChevronRight,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -38,7 +39,7 @@ const C = {
   sidebarBg:     '#3251B0', // matches the screenshot's sidebar colour
 };
 
-const API_URL = 'http://127.0.0.1:5001';
+const API_URL = 'http://127.0.0.1:5002';
 
 const MOCK_USERS: CurrentUser[] = [
   { user_id: 1, first_name: 'Nora', last_name: 'Admin', email: 'admin@campus.demo', department: 'Admin' },
@@ -105,6 +106,21 @@ const MOCK_BEDS: BedData[] = [
   { id: 108, dorm: 'South Hall', room_number: '415', bed_number: 'B', occupant: null, status: 'Available' },
 ];
 
+const MOCK_LOST_ID_CARDS: LostCardData[] = [
+  { user_id: 1001, card_id: 501, card_number: '1001', reported_date: '04-28-2026', status: 'Open', replacement_requested: true, notes: 'Student report card missing after leaving dorm.' },
+  { user_id: 1002, card_id: 502, card_number: '1002', reported_date: '04-29-2026', status: 'Under Review', replacement_requested: true, notes: 'Card was reported missing near the library.' },
+  { user_id: 1003, card_id: 503, card_number: '1003', reported_date: '04-30-2026', status: 'Resolved', replacement_requested: false, notes: 'Card found in lost and found.' },
+  { user_id: 1004, card_id: 504, card_number: '1004', reported_date: '05-01-2026', status: 'Closed', replacement_requested: true, notes: 'Replacement issued.' },
+];
+
+const MOCK_ACCESS_LOGS: AccessLogData[] = [
+  { log_id: 1, user_id: 1001, student_name: 'Jane Smith', access_type: 'Keycard Swipe', location: 'North Hall Entrance', time: '04-30-2026 08:15 AM', result: 'Granted' },
+  { log_id: 2, user_id: 1002, student_name: 'Michael Johnson', access_type: 'Login', location: 'Student Portal', time: '04-30-2026 09:05 AM', result: 'Success' },
+  { log_id: 3, user_id: 1003, student_name: 'Emily Davis', access_type: 'Keycard Swipe', location: 'Science Building Door 2', time: '04-30-2026 10:20 AM', result: 'Denied' },
+  { log_id: 4, user_id: 1001, student_name: 'Jane Smith', access_type: 'Keycard Swipe', location: 'Library Main Door', time: '04-30-2026 10:45 AM', result: 'Granted' },
+  { log_id: 5, user_id: 1004, student_name: 'Robert Wilson', access_type: 'Keycard Swipe', location: 'Dormitory Main Gate', time: '04-30-2026 11:30 AM', result: 'Granted' },
+];
+
 // ─── types ────────────────────────────────────────────────────────────────────
 interface CurrentUser {
   user_id: number;
@@ -162,6 +178,26 @@ interface BedData {
   bed_number: string;
   occupant: string | null;
   status: 'Occupied' | 'Available' | 'Maintenance';
+}
+
+interface LostCardData {
+  user_id: number;
+  card_id: number;
+  card_number: string;
+  reported_date: string;
+  status: 'Open' | 'Under Review' | 'Resolved' | 'Closed';
+  replacement_requested: boolean;
+  notes: string;
+}
+
+interface AccessLogData {
+  log_id: number;
+  user_id: number;
+  student_name: string;
+  access_type: string;
+  location: string;
+  time: string;
+  result: 'Granted' | 'Denied' | 'Success' | 'Failed';
 }
 
 type Section =
@@ -234,7 +270,7 @@ const getDormFromDepartment = (department?: string): string => {
 };
 
 // ─── root component ───────────────────────────────────────────────────────────
-export default function App() {
+export default function App({ onBackToPortal }: { onBackToPortal?: () => void }) {
   const [isLoggedIn,    setIsLoggedIn]    = useState(false);
   const [useMockAuth,   setUseMockAuth]   = useState(true);
   const [email,         setEmail]         = useState('');
@@ -267,6 +303,13 @@ export default function App() {
   // const [formDormRoom,     setFormDormRoom]     = useState('');
   const [maintenanceStaff, setMaintenanceStaff] = useState<string[]>([]);
   const [staffError,       setStaffError]       = useState('');
+  const [lostCards,        setLostCards]        = useState<LostCardData[]>([]);
+  const [isLoadingCards,   setIsLoadingCards]   = useState(false);
+  const [cardError,        setCardError]        = useState('');
+  const [accessLogs,       setAccessLogs]       = useState<AccessLogData[]>([]);
+  const [isLoadingLogs,    setIsLoadingLogs]    = useState(false);
+  const [logsError,        setLogsError]        = useState('');
+  const [accessTab,        setAccessTab]        = useState<'logs' | 'cards'>('logs');
 
   const currentDepartment = getCurrentDepartment(currentUser);
   const allowedSections = getRoleSections(currentDepartment);
@@ -357,10 +400,60 @@ export default function App() {
     }
   };
 
+  const fetchLostCards = async () => {
+    if (useMockAuth) {
+      setCardError('');
+      setLostCards(MOCK_LOST_ID_CARDS);
+      return;
+    }
+
+    try {
+      setIsLoadingCards(true);
+      setCardError('');
+      const res = await fetch(`${API_URL}/lost_id_cards`);
+      if (!res.ok) throw new Error(`Failed to fetch lost cards: ${res.status}`);
+      const data = await res.json();
+      setLostCards(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setCardError('Could not load lost ID cards from the backend.');
+    } finally {
+      setIsLoadingCards(false);
+    }
+  };
+
+  const fetchAccessLogs = async () => {
+    if (useMockAuth) {
+      setLogsError('');
+      setAccessLogs(MOCK_ACCESS_LOGS);
+      return;
+    }
+
+    try {
+      setIsLoadingLogs(true);
+      setLogsError('');
+      const res = await fetch(`${API_URL}/access_logs`);
+      if (!res.ok) throw new Error(`Failed to fetch access logs: ${res.status}`);
+      const data = await res.json();
+      setAccessLogs(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setLogsError('Could not load access logs from the backend.');
+    } finally {
+      setIsLoadingLogs(false);
+    }
+  };
+
   useEffect(() => { if (isLoggedIn) fetchTickets(); }, [isLoggedIn, useMockAuth]);
 
   useEffect(() => {
     if (isLoggedIn) fetchMaintenanceStaff();
+  }, [isLoggedIn, useMockAuth]);
+
+  useEffect(() => {
+    if (isLoggedIn) fetchLostCards();
+  }, [isLoggedIn, useMockAuth]);
+
+  useEffect(() => {
+    if (isLoggedIn) fetchAccessLogs();
   }, [isLoggedIn, useMockAuth]);
 
   useEffect(() => {
@@ -608,6 +701,9 @@ export default function App() {
     setCurrentUser(null); setTickets([]); setTicketError(''); setLoginError('');
     setPasswordError(''); setPasswordSuccess('');
     setActiveSection('home');
+    if (onBackToPortal) {
+      onBackToPortal();
+    }
   };
 
   // ── derived ticket counts ─────────────────────────────────────────────────
@@ -765,7 +861,19 @@ export default function App() {
             onSelectRoom={setSelectedRoom}
           />
         );
-      case 'access':      return <PlaceholderSection title="Access Control"      description="Issue access cards, view access logs, handle loss reports and card requests." color="#1a4a3a" />;
+      case 'access':
+        return (
+          <AccessControlSection
+            lostCards={lostCards}
+            isLoadingCards={isLoadingCards}
+            cardError={cardError}
+            accessLogs={accessLogs}
+            isLoadingLogs={isLoadingLogs}
+            logsError={logsError}
+            activeTab={accessTab}
+            onTabChange={setAccessTab}
+          />
+        );
       case 'academics':
         return (
           <AcademicsSection
@@ -869,6 +977,15 @@ export default function App() {
                 Department: {currentDepartment || 'Unknown'}
               </p>
             </div>
+            {onBackToPortal && (
+              <button
+                onClick={onBackToPortal}
+                className="w-full flex items-center gap-3 px-4 py-2.5 mb-2 rounded-xl transition-colors hover:bg-blue-500/20 text-blue-300 text-sm font-medium"
+              >
+                <ChevronRight size={16} className="rotate-180" />
+                Back to portal selection
+              </button>
+            )}
             <button
               onClick={handleLogout}
               className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-colors hover:bg-red-500/20 text-red-300 text-sm font-medium"
@@ -2751,6 +2868,227 @@ function TicketTable({
           )}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+// ─── Access Control Section ───────────────────────────────────────────────────
+// ─── Access Control Section ───────────────────────────────────────────────────
+function AccessControlSection({
+  lostCards,
+  isLoadingCards,
+  cardError,
+  accessLogs,
+  isLoadingLogs,
+  logsError,
+  activeTab,
+  onTabChange,
+}: {
+  lostCards: LostCardData[];
+  isLoadingCards: boolean;
+  cardError: string;
+  accessLogs: AccessLogData[];
+  isLoadingLogs: boolean;
+  logsError: string;
+  activeTab: 'logs' | 'cards';
+  onTabChange: (tab: 'logs' | 'cards') => void;
+}) {
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold" style={{ color: C.primaryDark }}>Access Control</h2>
+          <p className="text-sm mt-1" style={{ color: C.mutedBlue }}>
+            View access logs and manage lost ID cards
+          </p>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <StatCard label="Total Access Logs" value={accessLogs.length.toString()} accent="#3b82f6" />
+        <StatCard label="Denied Access" value={accessLogs.filter(l => l.result === 'Denied' || l.result === 'Failed').length.toString()} accent="#ef4444" />
+        <StatCard label="Lost Cards (Open)" value={lostCards.filter(c => c.status === 'Open').length.toString()} accent="#f59e0b" />
+      </div>
+
+      {/* Tab Navigation */}
+      <div className="bg-white rounded-2xl shadow-sm border border-black/5 overflow-hidden">
+        <div className="flex border-b border-black/5">
+          <button
+            onClick={() => onTabChange('logs')}
+            className={`flex-1 px-6 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'logs'
+                ? 'border-b-2 text-blue-600'
+                : 'text-gray-600 hover:text-gray-800'
+            }`}
+            style={activeTab === 'logs' ? { borderBottomColor: '#3b82f6' } : {}}
+          >
+            Access Logs (Door Swipes)
+          </button>
+          <button
+            onClick={() => onTabChange('cards')}
+            className={`flex-1 px-6 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'cards'
+                ? 'border-b-2 text-blue-600'
+                : 'text-gray-600 hover:text-gray-800'
+            }`}
+            style={activeTab === 'cards' ? { borderBottomColor: '#3b82f6' } : {}}
+          >
+            Lost ID Cards
+          </button>
+        </div>
+
+        {/* Access Logs Tab */}
+        {activeTab === 'logs' && (
+          <div>
+            {logsError && (
+              <div className="px-6 py-4 text-red-600 bg-red-50 border-b border-red-200">
+                {logsError}
+              </div>
+            )}
+
+            {isLoadingLogs ? (
+              <div className="px-6 py-8 text-center" style={{ color: C.mutedBlue }}>
+                Loading access logs...
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: C.steelBlue }}>
+                        Log ID
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: C.steelBlue }}>
+                        Name
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: C.steelBlue }}>
+                        Access Type
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: C.steelBlue }}>
+                        Door / Location
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: C.steelBlue }}>
+                        Time
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: C.steelBlue }}>
+                        Result
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {accessLogs.map((log) => (
+                      <tr key={log.log_id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-mono" style={{ color: C.mutedBlue }}>
+                          #{log.log_id}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium" style={{ color: C.primaryDark }}>
+                          {log.student_name}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: C.primaryDark }}>
+                          {log.access_type}
+                        </td>
+                        <td className="px-6 py-4 text-sm" style={{ color: C.primaryDark }}>
+                          {log.location}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: C.primaryDark }}>
+                          {log.time}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                            log.result === 'Granted' || log.result === 'Success'
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {log.result}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Lost Cards Tab */}
+        {activeTab === 'cards' && (
+          <div>
+            {cardError && (
+              <div className="px-6 py-4 text-red-600 bg-red-50 border-b border-red-200">
+                {cardError}
+              </div>
+            )}
+
+            {isLoadingCards ? (
+              <div className="px-6 py-8 text-center" style={{ color: C.mutedBlue }}>
+                Loading lost cards...
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: C.steelBlue }}>
+                        Card ID
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: C.steelBlue }}>
+                        User ID
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: C.steelBlue }}>
+                        Reported Date
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: C.steelBlue }}>
+                        Status
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: C.steelBlue }}>
+                        Replacement
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: C.steelBlue }}>
+                        Notes
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {lostCards.map((card) => (
+                      <tr key={card.card_id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium" style={{ color: C.primaryDark }}>
+                          #{card.card_id}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: C.primaryDark }}>
+                          {card.user_id}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: C.primaryDark }}>
+                          {card.reported_date}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                            card.status === 'Resolved' || card.status === 'Closed'
+                              ? 'bg-green-100 text-green-800'
+                              : card.status === 'Under Review'
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {card.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: C.primaryDark }}>
+                          {card.replacement_requested ? 'Yes' : 'No'}
+                        </td>
+                        <td className="px-6 py-4 text-sm" style={{ color: C.primaryDark }}>
+                          {card.notes}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
