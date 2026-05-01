@@ -331,28 +331,30 @@ def get_enrollments():
     connection = None
     cursor = None
     try:
+        user_id = request.args.get("user_id")
+
         connection = get_db_connection()
         cursor = connection.cursor(dictionary=True)
 
         query = """
-        SELECT 
+        SELECT
             e.enrollment_id,
-            e.enrollment_date,
+            c.course_code   AS course_id,
+            c.title         AS course_name,
+            sec.section_id  AS section,
+            c.credits,
             e.status,
             e.grade,
-            s.student_id,
-            c.course_code,
-            c.title,
-            sec.section_id,
-            sec.term
+            sec.term,
+            sec.instructor
         FROM Enrollment e
-        JOIN Student s ON e.student_id = s.student_id
-        JOIN Section sec ON e.section_id = sec.section_id
-        JOIN Course c ON sec.course_id = c.course_id
+        JOIN Student s   ON e.student_id  = s.student_id
+        JOIN Section sec ON e.section_id  = sec.section_id
+        JOIN Course c    ON sec.course_id = c.course_id
+        WHERE s.user_id = %s
         """
-        cursor.execute(query)
+        cursor.execute(query, (user_id,))
         results = cursor.fetchall()
-
         return success_response(results)
 
     except Error as e:
@@ -363,7 +365,6 @@ def get_enrollments():
             cursor.close()
         if connection and connection.is_connected():
             connection.close()
-
 
 # --------------------------
 # TICKETS - FULL CRUD
