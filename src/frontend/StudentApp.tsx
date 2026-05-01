@@ -48,9 +48,9 @@ const API_URL = "http://4.239.243.37:5001";
 // mock data for demo login
 const DEMO_USER: CurrentUser = {
   user_id: 2,
-  first_name: "Jordan",
-  last_name: "Miles",
-  email: "jordan.miles@university.edu",
+  first_name: "Summer",
+  last_name: "Holiday",
+  email: "summer.holiday@university.edu",
 };
 
 const DEMO_TICKETS: TicketData[] = [
@@ -198,6 +198,7 @@ export default function StudentApp({ onBackToPortal }: StudentAppProps) {
   const [ticketTitle, setTicketTitle] = useState("");
   const [ticketLocation, setTicketLocation] = useState("");
   const [ticketPriority, setTicketPriority] = useState("Medium");
+  const [ticketDesc, setTicketDesc] = useState("");
 
   // housing form fields
   const [housingModal, setHousingModal] = useState(false);
@@ -403,6 +404,7 @@ export default function StudentApp({ onBackToPortal }: StudentAppProps) {
       setHousingModal(false);
       setDormPreference("");
       setRoomType("Single");
+      setTicketDesc("");
 
       // reload data
       if (currentUser) fetchStudentData(currentUser.user_id);
@@ -1451,8 +1453,7 @@ export default function StudentApp({ onBackToPortal }: StudentAppProps) {
                   >
                     Location
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={ticketLocation}
                     onChange={(e) => setTicketLocation(e.target.value)}
                     className="w-full px-4 py-3 rounded-lg bg-transparent border outline-none"
@@ -1460,10 +1461,56 @@ export default function StudentApp({ onBackToPortal }: StudentAppProps) {
                       borderColor: COLORS.steelBlue,
                       color: COLORS.cream,
                     }}
-                    placeholder="e.g. Armstrong Hall, Room 214"
                     required
-                  />
+                  >
+                    <option value="" className="bg-slate-800">
+                      Select a location
+                    </option>
+                    <option value="Maple Hall" className="bg-slate-800">
+                      Maple Hall
+                    </option>
+                    <option value="Oak Hall" className="bg-slate-800">
+                      Oak Hall
+                    </option>
+                    <option value="Pine Hall" className="bg-slate-800">
+                      Pine Hall
+                    </option>
+                  </select>
                 </div>
+
+                <div>
+                  <label
+                    className="block text-sm font-medium mb-2"
+                    style={{ color: COLORS.steelBlue }}
+                  >
+                    Description
+                    <span
+                      className="ml-1 text-xs"
+                      style={{ color: COLORS.steelBlue }}
+                    >
+                      (optional)
+                    </span>
+                  </label>
+                  <textarea
+                    value={ticketDesc}
+                    onChange={(e) => setTicketDesc(e.target.value)}
+                    className="w-full px-4 py-3 rounded-lg bg-transparent border outline-none resize-none"
+                    style={{
+                      borderColor: COLORS.steelBlue,
+                      color: COLORS.cream,
+                    }}
+                    placeholder="Describe the issue in detail..."
+                    rows={3}
+                    maxLength={1000}
+                  />
+                  <p
+                    className="text-xs mt-1"
+                    style={{ color: COLORS.steelBlue }}
+                  >
+                    {ticketDesc.length}/1000
+                  </p>
+                </div>
+
                 <div>
                   <label
                     className="block text-sm font-medium mb-2"
@@ -1561,8 +1608,7 @@ export default function StudentApp({ onBackToPortal }: StudentAppProps) {
                   >
                     Dormitory Preference
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={dormPreference}
                     onChange={(e) => setDormPreference(e.target.value)}
                     className="w-full px-4 py-3 rounded-lg bg-transparent border outline-none"
@@ -1570,9 +1616,21 @@ export default function StudentApp({ onBackToPortal }: StudentAppProps) {
                       borderColor: COLORS.steelBlue,
                       color: COLORS.cream,
                     }}
-                    placeholder="e.g. Armstrong Hall"
                     required
-                  />
+                  >
+                    <option value="" className="bg-slate-800">
+                      Select a dormitory
+                    </option>
+                    <option value="Maple Hall" className="bg-slate-800">
+                      Maple Hall
+                    </option>
+                    <option value="Oak Hall" className="bg-slate-800">
+                      Oak Hall
+                    </option>
+                    <option value="Pine Hall" className="bg-slate-800">
+                      Pine Hall
+                    </option>
+                  </select>
                 </div>
                 <div>
                   <label
