@@ -53,36 +53,36 @@ const API_URL = 'http://4.239.243.37:5001';
 
 // mock data for demo login
 const DEMO_USER: CurrentUser = {
-  user_id: 12345,
-  first_name: 'Alex',
-  last_name: 'Johnson',
-  email: 'alex.johnson@university.edu',
+  user_id: 2,
+  first_name: 'Jordan',
+  last_name: 'Miles',
+  email: 'jordan.miles@university.edu',
 };
 
 const DEMO_TICKETS: TicketData[] = [
   {
     id: 101,
-    user_id: 12345,
-    title: 'Broken Desk Lamp',
-    status: 'In Progress',
-    priority: 'Medium',
-    dateSubmitted: '2026-04-20',
+    user_id: 2,
+    title: 'AC Unit Not Cooling',
+    status: 'Approved',
+    priority: 'High',
+    dateSubmitted: '2026-03-19',
   },
   {
     id: 102,
-    user_id: 12345,
-    title: 'AC Not Working',
+    user_id: 2,
+    title: 'Broken Desk Drawer',
     status: 'Pending',
-    priority: 'High',
-    dateSubmitted: '2026-04-25',
+    priority: 'Low',
+    dateSubmitted: '2026-03-25',
   },
   {
     id: 103,
-    user_id: 12345,
+    user_id: 2,
     title: 'Door Lock Issue',
     status: 'Resolved',
     priority: 'Medium',
-    dateSubmitted: '2026-04-18',
+    dateSubmitted: '2026-03-18',
   },
 ];
 
@@ -131,9 +131,9 @@ const DEMO_ENROLLMENTS: Enrollment[] = [
 
 const DEMO_HOUSING: HousingContract = {
   contract_id: 301,
-  dorm: 'Iverson',
-  room: '204B',
-  room_type: 'Double',
+  dorm: 'Oak Hall',
+  room: '202B',
+  room_type: 'Single',
   start_date: '2026-08-15',
   end_date: '2027-05-30',
   status: 'Active',
@@ -652,7 +652,7 @@ export default function StudentApp({ onBackToPortal }: StudentAppProps)
             className="w-full flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-red-500/10 text-red-400 transition-colors"
           >
             <LogOut size={16} />
-            <span className="text-sm font-medium">Back to portal</span>
+            <span className="text-sm font-medium">Log Out</span>
           </button>
         </div>
       </aside>
