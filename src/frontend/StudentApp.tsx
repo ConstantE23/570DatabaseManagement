@@ -402,6 +402,13 @@ export default function StudentApp({ onBackToPortal }: StudentAppProps)
   const handleAssignContract = async (e: React.FormEvent) =>
   {
     e.preventDefault();
+    //check if student has active housing
+    if(housing?.status === 'Active')
+    {
+      alert('You already have an active housing contract. Housing registration is not open at this time. Please contact the Housing Office if you have a concern.');
+      setHousingModal(false);
+      return;
+    }
 
     // for mock add housing
     if(mockMode)
@@ -1091,19 +1098,6 @@ export default function StudentApp({ onBackToPortal }: StudentAppProps)
                         Request Housing Assignment
                       </button>
                     </div>
-                  )}
-
-                  {housing?.status === 'Active' &&
-                  (
-                  <div className="p-4 rounded-xl mt-4" style={{ backgroundColor: COLORS.skyBlue + '66' }}>
-                    <p className="text-sm font-semibold" style={{ color: COLORS.primaryDark }}>
-                      Housing Registration Closed
-                      </p>
-                      <p className="text-xs mt-1" style={{ color: COLORS.mutedBlue }}>
-                        You have an active contract. Housing registration is not open at this time.
-                        If you have a concern please contact the Housing Office.
-                        </p>
-                      </div>
                   )}
                   
                   {housing?.status === 'Pending' &&
