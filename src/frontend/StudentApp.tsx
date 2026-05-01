@@ -337,8 +337,15 @@ export default function StudentApp({ onBackToPortal }: StudentAppProps)
   const handleCreateTicket = async (e: React.FormEvent) =>
   {
     e.preventDefault();
+    
+    //input validation
+    if(ticketTitle.trim().length < 5)
+    {
+      alert('Please enter a more descriptive title for your ticket');
+      return;
+    }
+    
     //if mock mode just add it locally without hitting the backend
-
     if(mockMode)
     {
       const newTicket: TicketData = 
@@ -396,6 +403,27 @@ export default function StudentApp({ onBackToPortal }: StudentAppProps)
   {
     e.preventDefault();
 
+    // for mock add housing
+    if(mockMode)
+    {
+      setHousing(
+        {
+          contract_id: 302,
+          dorm: dormPreference,
+          room: '101A',
+          room_type: roomType,
+          start_date: '2026-08-15',
+          end_date: '2027-05-30',
+          status: 'Pending',
+        }
+      );
+      setHousingModal(false);
+      setDormPreference('');
+      setRoomType('Single');
+      return;
+    }
+
+    //send to if backend is good
     try
     {
       const response = await fetch(`${API_URL}/housing/assign`,
@@ -1065,15 +1093,31 @@ export default function StudentApp({ onBackToPortal }: StudentAppProps)
                     </div>
                   )}
 
-                  {housing && (
-                    <button
-                      onClick={() => setHousingModal(true)}
-                      className="px-5 py-2.5 rounded-xl font-bold text-sm hover:opacity-90 active:scale-95 transition-all"
-                      style={{ backgroundColor: COLORS.mutedBlue, color: COLORS.cream }}
-                    >
-                      + Request New Contract
-                    </button>
+                  {housing?.status === 'Active' &&
+                  (
+                  <div className="p-4 rounded-xl mt-4" style={{ backgroundColor: COLORS.skyBlue + '66' }}>
+                    <p className="text-sm font-semibold" style={{ color: COLORS.primaryDark }}>
+                      Housing Registration Closed
+                      </p>
+                      <p className="text-xs mt-1" style={{ color: COLORS.mutedBlue }}>
+                        You have an active contract. Housing registration is not open at this time.
+                        If you have a concern please contact the Housing Office.
+                        </p>
+                      </div>
                   )}
+                  
+                  {housing?.status === 'Pending' &&
+                  (
+                  <div className="p-4 rounded-xl mt-4" style={{ backgroundColor: '#fef9c3' }}>
+                    <p className="text-sm font-semibold" style={{ color: '#a16207' }}>
+                      Request Pending Review
+                      </p>
+                      <p className="text-xs mt-1" style={{ color: '#a16207' }}>
+                        Your housing request is being reviewed by the Housing Office.
+                        </p>
+                        </div>
+                  )}
+  
                 </motion.div>
               )}
 
@@ -1084,7 +1128,8 @@ export default function StudentApp({ onBackToPortal }: StudentAppProps)
 
       {/* ticket form popup */}
       <AnimatePresence>
-        {ticketModal && (
+        {
+        ticketModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0 }}
@@ -1121,6 +1166,8 @@ export default function StudentApp({ onBackToPortal }: StudentAppProps)
                     className="w-full px-4 py-3 rounded-lg bg-transparent border outline-none"
                     style={{ borderColor: COLORS.steelBlue, color: COLORS.cream }}
                     placeholder="e.g. Broken AC in Room 214"
+                    minLength = {5}
+                    maxLength = {100}
                     required
                   />
                 </div>
@@ -1177,7 +1224,8 @@ export default function StudentApp({ onBackToPortal }: StudentAppProps)
 
       {/* housing form popup */}
       <AnimatePresence>
-        {housingModal && (
+        {
+        housingModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0 }}
