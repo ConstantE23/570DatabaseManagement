@@ -40,6 +40,8 @@ const C = {
 };
 
 const API_URL = 'http://127.0.0.1:5002';
+const apiFetch = (input: RequestInfo | URL, init: RequestInit = {}) =>
+  fetch(input, { credentials: 'include', ...init });
 
 const MOCK_USERS: CurrentUser[] = [
   { user_id: 1, first_name: 'Nora', last_name: 'Admin', email: 'admin@campus.demo', department: 'Admin' },
@@ -235,6 +237,7 @@ const ROLE_SECTION_ACCESS: Record<string, Section[]> = {
 
 const getRoleSections = (role?: string): Section[] => {
   if (!role) return ALL_SECTIONS;
+  if (role === 'faculty') return ['home', 'academics'];
   return ROLE_SECTION_ACCESS[role] ?? ['home'];
 };
 
@@ -313,7 +316,9 @@ export default function App({ onBackToPortal }: { onBackToPortal?: () => void })
   const [accessTab,        setAccessTab]        = useState<'logs' | 'cards'>('logs');
 
   const currentDepartment = getCurrentDepartment(currentUser);
-  const allowedSections = getRoleSections(currentDepartment);
+  const allowedSections: Section[] = currentUser?.role === 'faculty'
+    ? ['home', 'academics']
+    : getRoleSections(currentDepartment);
   const visibleNavItems = NAV_ITEMS.filter(item => allowedSections.includes(item.id));
   const assigneeOptions = Array.from(new Set([
     ...(formAssignee ? [formAssignee] : []),
@@ -325,7 +330,7 @@ export default function App({ onBackToPortal }: { onBackToPortal?: () => void })
     try {
       setIsLoadingTickets(true);
       setTicketError('');
-      const res = await fetch(`${API_URL}/tickets`);
+      const res = await apiFetch(`${API_URL}/tickets`);
       if (!res.ok) throw new Error(`Failed to fetch tickets: ${res.status}`);
       const data = await res.json();
       setTickets(Array.isArray(data) ? data : []);
@@ -354,7 +359,7 @@ export default function App({ onBackToPortal }: { onBackToPortal?: () => void })
 
     try {
       setStaffError('');
-      const scopedRes = await fetch(`${API_URL}/users?department=${encodeURIComponent('Facilities Management')}`);
+      const scopedRes = await apiFetch(`${API_URL}/users?department=${encodeURIComponent('Facilities Management')}`);
       if (scopedRes.ok) {
         const scopedData = await scopedRes.json().catch(() => ([]));
         const scopedNames = Array.from(new Set(parseNames(scopedData)));
@@ -364,7 +369,7 @@ export default function App({ onBackToPortal }: { onBackToPortal?: () => void })
         }
       }
 
-      const allRes = await fetch(`${API_URL}/users`);
+      const allRes = await apiFetch(`${API_URL}/users`);
       if (!allRes.ok) throw new Error('Could not fetch users.');
       const allData = await allRes.json().catch(() => ([]));
       const allRows = Array.isArray(allData)
@@ -387,7 +392,7 @@ export default function App({ onBackToPortal }: { onBackToPortal?: () => void })
 
   const fetchUsers = async () => {
     try {
-      const res = await fetch(`${API_URL}/retrieve-users`);
+      const res = await apiFetch(`${API_URL}/retrieve-users`);
       if (!res.ok) throw new Error(`Failed to fetch users: ${res.status}`);
       const data = await res.json();
       setUsers(Array.isArray(data) ? data : []);
@@ -398,7 +403,7 @@ export default function App({ onBackToPortal }: { onBackToPortal?: () => void })
 
   const fetchRooms = async () => {
     try {
-      const res = await fetch(`${API_URL}/get-rooms`);
+      const res = await apiFetch(`${API_URL}/get-rooms`);
       if (!res.ok) throw new Error(`Failed to fetch rooms: ${res.status}`);
       const data = await res.json();
       const mappedRooms = (Array.isArray(data) ? data : []).reduce<RoomData[]>((acc, row) => {
@@ -424,7 +429,7 @@ export default function App({ onBackToPortal }: { onBackToPortal?: () => void })
     try {
       setIsLoadingCards(true);
       setCardError('');
-      const res = await fetch(`${API_URL}/lost_id_cards`);
+      const res = await apiFetch(`${API_URL}/lost_id_cards`);
       if (!res.ok) throw new Error(`Failed to fetch lost cards: ${res.status}`);
       const data = await res.json();
       setLostCards(Array.isArray(data) ? data : []);
@@ -439,7 +444,7 @@ export default function App({ onBackToPortal }: { onBackToPortal?: () => void })
     try {
       setIsLoadingLogs(true);
       setLogsError('');
-      const res = await fetch(`${API_URL}/access_logs`);
+      const res = await apiFetch(`${API_URL}/access_logs`);
       if (!res.ok) throw new Error(`Failed to fetch access logs: ${res.status}`);
       const data = await res.json();
       setAccessLogs(Array.isArray(data) ? data : []);
@@ -486,10 +491,6 @@ export default function App({ onBackToPortal }: { onBackToPortal?: () => void })
       setPasswordError('Please complete all password fields.');
       return;
     }
-    if (currentPassword !== authPassword) {
-      setPasswordError('Current password is incorrect.');
-      return;
-    }
     if (nextPassword.length < 6) {
       setPasswordError('New password must be at least 6 characters.');
       return;
@@ -501,7 +502,7 @@ export default function App({ onBackToPortal }: { onBackToPortal?: () => void })
 
     try {
       setIsChangingPassword(true);
-      const res = await fetch(`${API_URL}/change-password`, {
+      const res = await apiFetch(`${API_URL}/change-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -563,7 +564,7 @@ export default function App({ onBackToPortal }: { onBackToPortal?: () => void })
     try {
       setTicketError('');
       if (editingTicket) {
-        const res = await fetch(`${API_URL}/tickets/${editingTicket.id}`, {
+        const res = await apiFetch(`${API_URL}/tickets/${editingTicket.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -578,7 +579,7 @@ export default function App({ onBackToPortal }: { onBackToPortal?: () => void })
         });
         if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Update failed');
       } else {
-        const res = await fetch(`${API_URL}/tickets`, {
+        const res = await apiFetch(`${API_URL}/tickets`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -607,7 +608,7 @@ export default function App({ onBackToPortal }: { onBackToPortal?: () => void })
   const handleDeleteTicket = async (id: number) => {
     try {
       setTicketError('');
-      const res = await fetch(`${API_URL}/tickets/${id}`, { method: 'DELETE' });
+      const res = await apiFetch(`${API_URL}/tickets/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Delete failed');
       setTickets(prev => prev.filter(t => t.id !== id));
     } catch (err) {
@@ -621,7 +622,7 @@ export default function App({ onBackToPortal }: { onBackToPortal?: () => void })
 
     try {
       setLoginError('');
-      const res = await fetch(`${API_URL}/login`, {
+      const res = await apiFetch(`${API_URL}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -631,6 +632,7 @@ export default function App({ onBackToPortal }: { onBackToPortal?: () => void })
       const normalizedUser: CurrentUser = {
         ...data.user,
         department: data.user?.department ?? data.user?.role,
+        role: data.role ?? data.user?.role,
       };
       setCurrentUser(normalizedUser);
       setUsers([normalizedUser]);
@@ -643,6 +645,7 @@ export default function App({ onBackToPortal }: { onBackToPortal?: () => void })
   };
 
   const handleLogout = () => {
+    void apiFetch(`${API_URL}/logout`, { method: 'POST' });
     setIsLoggedIn(false); setEmail(''); setPassword('');
     setAuthPassword('');
     setCurrentUser(null); setUsers([]); setRooms([]); setTickets([]); setTicketError(''); setLoginError('');
@@ -1742,7 +1745,7 @@ function AccountManagementSection({ users }: { users: CurrentUser[] }) {
 
     try {
       setDepartmentNotice('');
-      const res = await fetch(`${API_URL}/update-department`, {
+      const res = await apiFetch(`${API_URL}/update-department`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1791,7 +1794,7 @@ function AccountManagementSection({ users }: { users: CurrentUser[] }) {
 
     try {
       setPasswordNotice('');
-      const res = await fetch(`${API_URL}/update-password`, {
+      const res = await apiFetch(`${API_URL}/update-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2240,8 +2243,8 @@ function AcademicsSection({
     const loadAcademics = async () => {
       try {
         const [courseRes, sectionRes] = await Promise.all([
-          fetch(`${API_URL}/courses`),
-          fetch(`${API_URL}/sections`),
+          apiFetch(`${API_URL}/courses`),
+          apiFetch(`${API_URL}/sections`),
         ]);
 
         const courseData = courseRes.ok ? await courseRes.json() : [];
@@ -2295,7 +2298,7 @@ function AcademicsSection({
       return;
     }
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         editingCourseId ? `${API_URL}/courses/${editingCourseId}` : `${API_URL}/courses`,
         {
           method: editingCourseId ? 'PUT' : 'POST',
@@ -2306,7 +2309,7 @@ function AcademicsSection({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Could not save course');
       setCourseFormMessage(editingCourseId ? 'Course updated successfully!' : 'Course created successfully!');
-      const refreshed = await fetch(`${API_URL}/courses`);
+      const refreshed = await apiFetch(`${API_URL}/courses`);
       setCourses(await refreshed.json().catch(() => []));
     } catch (err) {
       setCourseFormMessage(err instanceof Error ? err.message : 'Could not save course.');
@@ -2337,7 +2340,7 @@ function AcademicsSection({
       return;
     }
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         editingSectionId ? `${API_URL}/sections/${editingSectionId}` : `${API_URL}/sections`,
         {
           method: editingSectionId ? 'PUT' : 'POST',
@@ -2348,7 +2351,7 @@ function AcademicsSection({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Could not save section');
       setSectionFormMessage(editingSectionId ? 'Section updated successfully!' : 'Section created successfully!');
-      const refreshed = await fetch(`${API_URL}/sections`);
+      const refreshed = await apiFetch(`${API_URL}/sections`);
       setSections(await refreshed.json().catch(() => []));
     } catch (err) {
       setSectionFormMessage(err instanceof Error ? err.message : 'Could not save section.');

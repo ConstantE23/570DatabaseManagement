@@ -3,3 +3,4 @@ gunicorn
 pymongo
 flask-cors
 mysql-connector-python
+functools

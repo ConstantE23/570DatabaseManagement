@@ -1,3 +1,5 @@
+import os
+
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import mysql.connector
@@ -6,10 +8,24 @@ from pymongo import MongoClient
 from pymongo.errors import PyMongoError
 from datetime import datetime
 from werkzeug.security import check_password_hash, generate_password_hash
+from functools import wraps
+from flask import session
 
 
 app = Flask(__name__)
-CORS(app)
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-secret-key")
+CORS(
+    app,
+    supports_credentials=True,
+    origins=[
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://localhost:3002",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3002",
+    ],
+)
 
 # --------------------------
 # DATABASE CONNECTION
@@ -38,6 +54,7 @@ try:
     print("[startup] Mongo indexes ready")
 except PyMongoError as e:
     print(f"[startup] Could not create indexes: {e}")
+
 
 
 def mysql_table_exists(cursor, table_name):
@@ -156,6 +173,57 @@ def success_response(data, status_code=200):
 
 def error_response(message, status_code=500):
     return jsonify({"error": message}), status_code
+
+DEPARTMENT_PERMISSIONS = {
+    "Admin":       {"all"},
+    "IT":          {"all"},
+    "Maintenance": {"maintenance"},
+    "Housing":     {"housing"},
+    "Provost":     {"academics"},
+}
+
+def require_department(*allowed_sections):
+    """
+    Decorator: only allow users whose department grants access to one of the listed sections.
+    Admin and IT (which have 'all') always pass.
+    """
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            user_id = session.get("user_id")
+            department = session.get("department")
+
+            if not user_id:
+                return error_response("Not authenticated", 401)
+
+            permissions = DEPARTMENT_PERMISSIONS.get(department, set())
+
+            if "all" in permissions:
+                return fn(*args, **kwargs)
+
+            if not permissions.intersection(allowed_sections):
+                log_activity(
+                    user_id=user_id,
+                    event_type="authorization_denied",
+                    result="denied",
+                    details={"department": department, "endpoint": request.path},
+                )
+                return error_response("Forbidden: insufficient permissions", 403)
+
+            return fn(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
+def require_login(fn):
+    """Decorator: any authenticated user is fine."""
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        if not session.get("user_id"):
+            return error_response("Not authenticated", 401)
+        return fn(*args, **kwargs)
+    return wrapper
+
 
 
 # --------------------------
@@ -838,15 +906,47 @@ def login():
             )
             return error_response("Invalid email or password", 401)
 
-        # 3. Check role.
-        cursor.execute("SELECT staff_id, department FROM Staff WHERE user_id = %s", (user["user_id"],))
-        staff_record = cursor.fetchone()
-        role = "staff" if staff_record else "student"
+        # 3. Check Faculty table for department-based authorization.
+        faculty_record = None
+        if mysql_table_exists(cursor, "Faculty"):
+            cursor.execute(
+                "SELECT faculty_id, department FROM Faculty WHERE user_id = %s",
+                (user["user_id"],),
+            )
+            faculty_record = cursor.fetchone()
 
+        # Fall back to Staff/Student for users not yet migrated to Faculty.
+        staff_record = None
         student_record = None
-        if not staff_record:
-            cursor.execute("SELECT student_id, major, class_level FROM Student WHERE user_id = %s", (user["user_id"],))
-            student_record = cursor.fetchone()
+        if not faculty_record:
+            cursor.execute(
+                "SELECT staff_id, department FROM Staff WHERE user_id = %s",
+                (user["user_id"],),
+            )
+            staff_record = cursor.fetchone()
+            if not staff_record:
+                cursor.execute(
+                    "SELECT student_id, major, class_level FROM Student WHERE user_id = %s",
+                    (user["user_id"],),
+                )
+                student_record = cursor.fetchone()
+
+        if faculty_record:
+            department = faculty_record["department"]
+            role = "faculty"
+        elif staff_record:
+            department = staff_record["department"]
+            role = "staff"
+        elif student_record:
+            department = None
+            role = "student"
+        else:
+            department = None
+            role = "unknown"
+
+        session["user_id"] = user["user_id"]
+        session["department"] = department
+        session["role"] = role
 
         # 4. Log and Respond
         log_activity(
@@ -864,7 +964,7 @@ def login():
                 "first_name": user["first_name"],
                 "last_name": user["last_name"],
                 "email": user["email"],
-                "department": staff_record["department"] if staff_record else None,
+                "department": department,
                 "major": student_record["major"] if student_record else None,
                 "class_level": student_record["class_level"] if student_record else None,
             }
@@ -1981,6 +2081,10 @@ def get_card_requests():
         if connection and connection.is_connected():
             connection.close()
 
+@app.route("/logout", methods=["POST"])
+def logout():
+    session.clear()
+    return success_response({"message": "Logged out"})
 
 # --------------------------
 # RUN APP
